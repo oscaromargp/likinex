@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+:root {
+  --background: #020617;
+  --foreground: #ffffff;
+  --primary: #10B981;
+  --primary-foreground: #ffffff;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: 'Inter', system-ui, sans-serif;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1e293b transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+::selection {
+  background: rgba(16, 185, 129, 0.3);
+  color: white;
+}
+
+input, select, textarea {
+  font-family: inherit;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 1000px #0f172a inset !important;
+  -webkit-text-fill-color: white !important;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { 
+    box-shadow: 0 0 0 1px rgba(16, 185, 129, 0.5), 0 4px 24px rgba(16, 185, 129, 0.4);
+  }
+  50% { 
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.8), 0 8px 40px rgba(16, 185, 129, 0.6);
+  }
+}
+
+@keyframes fade-in-up {
+  from { 
+    opacity: 0; 
+    transform: translateY(30px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.8s ease;
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 3s ease-in-out infinite;
+}
