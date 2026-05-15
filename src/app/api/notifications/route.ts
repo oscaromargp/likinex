@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://demo.supabase.co';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'demo-key';
 
-const supabase = createClient(supabaseUrl, supabaseKey);
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+let supabase: SupabaseClient | null = null;
+
+function getSupabaseClient() {
+  if (!supabase) {
+    supabase = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabase;
+}
 
 const N8N_API_KEY = process.env.N8N_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYzE4MDdkZS0xMTI4LTQ1OTgtYjE5OS1mZjQ2ZmIwZGYzODUiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYTVjMDYyMTMtYTQ3OS00MWNiLWI4ZWUtZDBlMjIxNzAxNTYyIiwiaWF0IjoxNzc4ODA3MTU3fQ.YSuBJJjuNl9NGhBJxF9nwvunsZW3TxdgOkLanxcwcpo';
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.antigravity.com.mx/webhook/likinex-notifications';
@@ -54,28 +57,34 @@ async function sendToN8N(payload: NotificationPayload) {
 }
 
 async function saveNotification(payload: NotificationPayload) {
-  const { data, error } = await supabase
-    .from('notifications_log')
-    .insert({
-      type: payload.type,
-      title: payload.title,
-      message: payload.message,
-      priority: payload.priority,
-      phone: payload.phone || DEFAULT_WHATSAPP_PHONE,
-      user_id: payload.userId,
-      transaction_id: payload.transactionId,
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-    })
-    .select()
-    .single();
+  try {
+    const client = getSupabaseClient();
+    const { data, error } = await client
+      .from('notifications_log')
+      .insert({
+        type: payload.type,
+        title: payload.title,
+        message: payload.message,
+        priority: payload.priority,
+        phone: payload.phone || DEFAULT_WHATSAPP_PHONE,
+        user_id: payload.userId,
+        transaction_id: payload.transactionId,
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
 
-  if (error) {
-    console.error('Error saving notification:', error);
+    if (error) {
+      console.error('Error saving notification:', error);
+      return null;
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Supabase error:', error);
     return null;
   }
-
-  return data;
 }
 
 export async function POST(request: NextRequest) {
@@ -129,7 +138,8 @@ export async function GET(request: NextRequest) {
     const userId = searchParams.get('user_id');
     const limit = parseInt(searchParams.get('limit') || '50');
 
-    let query = supabase
+    const client = getSupabaseClient();
+    let query = client
       .from('notifications_log')
       .select('*')
       .order('created_at', { ascending: false })
