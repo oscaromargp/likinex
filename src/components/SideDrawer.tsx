@@ -1,13 +1,20 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, DollarSign, FileText, Clock, CreditCard, Paperclip, Save, Upload, Trash2, Eye, Download, Image as ImageIcon } from 'lucide-react';
-import { Transaction, TransactionStatus, PaymentMethod, ENTITY_LABELS, STATUS_LABELS, Currency, CURRENCY_SYMBOLS, convertCurrency, calculatePunctuality, calculateConsecutiveOnTime, getScoreLabel, Attachment } from '@/types';
+import { X, Calendar, DollarSign, FileText, Clock, CreditCard, Paperclip, Save, Upload, Trash2, Eye, Download, Image as ImageIcon, Edit3, Plus, History } from 'lucide-react';
+import { Transaction, TransactionStatus, PaymentMethod, ENTITY_LABELS, STATUS_LABELS, Currency, CURRENCY_SYMBOLS, convertCurrency, calculatePunctuality, calculateConsecutiveOnTime, getScoreLabel, Attachment, EntityConfig, DEFAULT_ENTITIES, getEntityIcon, getEntityLabel } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 const CURRENCIES: Currency[] = ['MXN', 'USD', 'BTC', 'ETH', 'USDT'];
+const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string }[] = [
+  { value: 'transfer', label: 'Transferencia', icon: '🏦' },
+  { value: 'cash', label: 'Efectivo', icon: '💵' },
+  { value: 'card', label: 'Tarjeta', icon: '💳' },
+  { value: 'check', label: 'Cheque', icon: '📝' },
+  { value: 'other', label: 'Otro', icon: '📦' },
+];
 
 interface SideDrawerProps {
   transaction: Transaction | null;
@@ -15,6 +22,7 @@ interface SideDrawerProps {
   onClose: () => void;
   onUpdate?: (transaction: Transaction) => void;
   allTransactions?: Transaction[];
+  entities?: EntityConfig[];
 }
 
 interface AttachmentWithPreview extends Attachment {
@@ -22,9 +30,24 @@ interface AttachmentWithPreview extends Attachment {
   base64?: string;
 }
 
-export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, allTransactions = [] }: SideDrawerProps) {
-  const [activeTab, setActiveTab] = useState<'details' | 'payment' | 'followup' | 'attachments'>('details');
-  const [formData, setFormData] = useState({
+interface PaymentRecord {
+  id: string;
+  amount: number;
+  method: PaymentMethod;
+  recipient: string;
+  date: string;
+  notes: string;
+}
+
+export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, allTransactions = [], entities = [] }: SideDrawerProps) {
+  const [activeTab, setActiveTab] = useState<'details' | 'payment' | 'followup' | 'attachments' | 'history'>('details');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    description: '',
+    amount: 0,
+    due_date: '',
+    entity: '',
+    category: '',
     notes: '',
     payment_method: '',
     follow_up: '',
@@ -35,7 +58,73 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
   const [attachments, setAttachments] = useState<AttachmentWithPreview[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<AttachmentWithPreview | null>(null);
+  const [paymentRecords, setPaymentRecords] = useState<PaymentRecord[]>([]);
+  const [newPayment, setNewPayment] = useState<Partial<PaymentRecord>>({
+    amount: 0,
+    method: 'transfer',
+    recipient: '',
+    date: new Date().toISOString().split('T')[0],
+    notes: ''
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (transaction) {
+      setEditForm({
+        description: transaction.description || '',
+        amount: transaction.amount || 0,
+        due_date: transaction.due_date || '',
+        entity: transaction.entity || '',
+        category: transaction.category || '',
+        notes: transaction.notes || '',
+        payment_method: transaction.payment_method || '',
+        follow_up: transaction.follow_up || '',
+        price_change: transaction.price_change || 0,
+        currency: 'MXN',
+        displayCurrency: 'MXN'
+      });
+      setIsEditing(false);
+      loadPaymentRecords();
+    }
+  }, [transaction?.id]);
+
+  const loadPaymentRecords = () => {
+    if (transaction) {
+      const saved = localStorage.getItem(`likinex_payments_${transaction.id}`);
+      if (saved) {
+        setPaymentRecords(JSON.parse(saved));
+      } else {
+        setPaymentRecords([]);
+      }
+    }
+  };
+
+  const savePaymentRecords = (records: PaymentRecord[]) => {
+    setPaymentRecords(records);
+    if (transaction) {
+      localStorage.setItem(`likinex_payments_${transaction.id}`, JSON.stringify(records));
+    }
+  };
+
+  const addPaymentRecord = () => {
+    if (!newPayment.amount || !newPayment.recipient) return;
+    const record: PaymentRecord = {
+      id: `pay_${Date.now()}`,
+      amount: newPayment.amount || 0,
+      method: (newPayment.method as PaymentMethod) || 'transfer',
+      recipient: newPayment.recipient || '',
+      date: newPayment.date || new Date().toISOString().split('T')[0],
+      notes: newPayment.notes || ''
+    };
+    const updated = [...paymentRecords, record];
+    savePaymentRecords(updated);
+    setNewPayment({ amount: 0, method: 'transfer', recipient: '', date: new Date().toISOString().split('T')[0], notes: '' });
+  };
+
+  const deletePaymentRecord = (id: string) => {
+    const updated = paymentRecords.filter(r => r.id !== id);
+    savePaymentRecords(updated);
+  };
 
   const convertAndDisplay = (amount: number, from: Currency, to: Currency) => {
     if (from === to) return amount;
@@ -54,12 +143,19 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
       const attachmentUrls = attachments.map(a => a.base64 || a.file_path).join(',');
       onUpdate({
         ...transaction,
-        notes: formData.notes || transaction.notes,
-        payment_method: formData.payment_method as PaymentMethod || transaction.payment_method,
-        price_change: formData.price_change || undefined,
+        description: editForm.description || transaction.description,
+        amount: editForm.amount || transaction.amount,
+        due_date: editForm.due_date || transaction.due_date,
+        entity: editForm.entity as any || transaction.entity,
+        category: editForm.category as any || transaction.category,
+        notes: editForm.notes || transaction.notes,
+        payment_method: editForm.payment_method as PaymentMethod || transaction.payment_method,
+        follow_up: editForm.follow_up || transaction.follow_up,
+        price_change: editForm.price_change || undefined,
         attachment_url: attachmentUrls || transaction.attachment_url
       });
     }
+    setIsEditing(false);
     onClose();
   };
 
@@ -175,9 +271,12 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
   const tabs = [
     { id: 'details', label: 'Detalles', icon: FileText },
     { id: 'payment', label: 'Pago', icon: CreditCard },
+    { id: 'history', label: 'Historial', icon: History },
     { id: 'followup', label: 'Seguimiento', icon: Clock },
     { id: 'attachments', label: 'Adjuntos', icon: Paperclip, count: attachments.length }
   ] as const;
+
+  const allEntities = [...DEFAULT_ENTITIES, ...entities.filter(e => !DEFAULT_ENTITIES.find(d => d.id === e.id))];
 
   return (
     <AnimatePresence>
@@ -198,9 +297,28 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
             className="fixed right-0 top-0 h-full w-full max-w-md bg-slate-900 border-l border-emerald-500/20 z-50 flex flex-col"
           >
             <div className="flex items-center justify-between p-6 border-b border-slate-800/50">
-              <div>
-                <h2 className="text-lg font-bold text-white">Gestión de Transacción</h2>
-                <p className="text-sm text-slate-400">{transaction.description}</p>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-lg font-bold text-white">
+                    {isEditing ? 'Editar Transacción' : 'Gestión de Transacción'}
+                  </h2>
+                  <button
+                    onClick={() => setIsEditing(!isEditing)}
+                    className="p-1 rounded hover:bg-slate-700 transition-colors"
+                  >
+                    <Edit3 className="w-4 h-4 text-slate-400" />
+                  </button>
+                </div>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editForm.description}
+                    onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-sm text-white focus:outline-none focus:border-blue-500"
+                  />
+                ) : (
+                  <p className="text-sm text-slate-400">{transaction.description}</p>
+                )}
               </div>
               <button
                 onClick={onClose}
@@ -262,8 +380,8 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs text-slate-400">Monto</p>
                       <select
-                        value={formData.displayCurrency}
-                        onChange={e => setFormData(f => ({ ...f, displayCurrency: e.target.value as Currency }))}
+                        value={editForm.displayCurrency}
+                        onChange={e => setEditForm(f => ({ ...f, displayCurrency: e.target.value as Currency }))}
                         className="bg-slate-700/50 text-xs text-white px-2 py-1 rounded-lg border border-slate-600"
                       >
                         {CURRENCIES.map(c => (
@@ -272,9 +390,9 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
                       </select>
                     </div>
                     <p className="text-2xl font-bold text-emerald-400">
-                      {CURRENCY_SYMBOLS[formData.displayCurrency]}{convertAndDisplay(transaction.amount, 'MXN', formData.displayCurrency).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {CURRENCY_SYMBOLS[editForm.displayCurrency]}{convertAndDisplay(transaction.amount, 'MXN', editForm.displayCurrency).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
-                    {formData.displayCurrency !== 'MXN' && (
+                    {editForm.displayCurrency !== 'MXN' && (
                       <p className="text-xs text-slate-500 mt-1">≈ {formatCurrency(transaction.amount)} MXN</p>
                     )}
                   </div>
@@ -317,8 +435,8 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
                   <div>
                     <label className="text-xs text-slate-400 mb-2 block">Notas</label>
                     <textarea
-                      value={formData.notes}
-                      onChange={e => setFormData(f => ({ ...f, notes: e.target.value }))}
+                      value={editForm.notes}
+                      onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
                       placeholder="Agregar notas..."
                       rows={4}
                       className="w-full p-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 transition-colors resize-none"
@@ -332,8 +450,8 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
                   <div>
                     <label className="text-xs text-slate-400 mb-2 block">Método de Pago</label>
                     <select
-                      value={formData.payment_method}
-                      onChange={e => setFormData(f => ({ ...f, payment_method: e.target.value }))}
+                      value={editForm.payment_method}
+                      onChange={e => setEditForm(f => ({ ...f, payment_method: e.target.value }))}
                       className="w-full p-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
                     >
                       <option value="">Seleccionar...</option>
@@ -351,8 +469,8 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                       <input
                         type="number"
-                        value={formData.price_change}
-                        onChange={e => setFormData(f => ({ ...f, price_change: Number(e.target.value) }))}
+                        value={editForm.price_change}
+                        onChange={e => setEditForm(f => ({ ...f, price_change: Number(e.target.value) }))}
                         className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
                       />
                     </div>
@@ -371,8 +489,8 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
                       <Clock className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
                       <input
                         type="datetime-local"
-                        value={formData.follow_up}
-                        onChange={e => setFormData(f => ({ ...f, follow_up: e.target.value }))}
+                        value={editForm.follow_up}
+                        onChange={e => setEditForm(f => ({ ...f, follow_up: e.target.value }))}
                         className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
                       />
                     </div>
@@ -384,6 +502,98 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
                       Las transacciones pendientes con menos de 72 horas se marcarán como urgentes automáticamente.
                     </p>
                   </div>
+                </div>
+              )}
+
+              {activeTab === 'history' && (
+                <div className="space-y-6">
+                  <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
+                    <h4 className="text-blue-400 font-medium mb-3 flex items-center gap-2">
+                      <Plus className="w-4 h-4" />
+                      Registrar Pago
+                    </h4>
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        <input
+                          type="number"
+                          placeholder="Monto"
+                          value={newPayment.amount || ''}
+                          onChange={e => setNewPayment(p => ({ ...p, amount: Number(e.target.value) }))}
+                          className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        />
+                        <input
+                          type="text"
+                          placeholder="Quién recibió"
+                          value={newPayment.recipient || ''}
+                          onChange={e => setNewPayment(p => ({ ...p, recipient: e.target.value }))}
+                          className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <select
+                          value={newPayment.method}
+                          onChange={e => setNewPayment(p => ({ ...p, method: e.target.value as PaymentMethod }))}
+                          className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        >
+                          {PAYMENT_METHODS.map(m => (
+                            <option key={m.value} value={m.value}>{m.icon} {m.label}</option>
+                          ))}
+                        </select>
+                        <input
+                          type="date"
+                          value={newPayment.date}
+                          onChange={e => setNewPayment(p => ({ ...p, date: e.target.value }))}
+                          className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
+                        />
+                      </div>
+                      <button
+                        onClick={addPaymentRecord}
+                        className="w-full py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Agregar Pago
+                      </button>
+                    </div>
+                  </div>
+
+                  {paymentRecords.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-semibold text-slate-400 mb-3">Historial de Pagos</h4>
+                      <div className="space-y-2">
+                        {paymentRecords.map((record) => (
+                          <div key={record.id} className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-white font-medium">
+                                {PAYMENT_METHODS.find(m => m.value === record.method)?.icon} {formatCurrency(record.amount)}
+                              </span>
+                              <button
+                                onClick={() => deletePaymentRecord(record.id)}
+                                className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                            <div className="flex items-center gap-2 text-xs text-slate-400">
+                              <span>👤 {record.recipient}</span>
+                              <span>•</span>
+                              <span>{formatDate(record.date)}</span>
+                            </div>
+                            {record.notes && (
+                              <p className="text-xs text-slate-500 mt-1">{record.notes}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {paymentRecords.length === 0 && (
+                    <div className="text-center py-8 text-slate-500">
+                      <History className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                      <p>No hay pagos registrados</p>
+                      <p className="text-xs mt-1">Agrega el primer pago usando el formulario de arriba</p>
+                    </div>
+                  )}
                 </div>
               )}
 
