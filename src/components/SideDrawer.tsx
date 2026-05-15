@@ -131,6 +131,30 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
     return convertCurrency(amount, from, to);
   };
 
+  const loadAttachments = useCallback(() => {
+    if (!transaction?.attachment_url) {
+      setAttachments([]);
+      return;
+    }
+    const savedAttachments = localStorage.getItem(`likinex_attachments_${transaction.id}`);
+    if (savedAttachments) {
+      setAttachments(JSON.parse(savedAttachments));
+    } else {
+      const urls = transaction.attachment_url.split(',').filter(Boolean);
+      const defaultAttachments: AttachmentWithPreview[] = urls.map((url, i) => ({
+        id: `default_${i}`,
+        transaction_id: transaction.id,
+        file_name: url.includes('base64') ? 'archivo_adjunto' : url.split('/').pop() || 'archivo',
+        file_path: url,
+        file_type: url.includes('base64') ? 'image/png' : 'application/pdf',
+        file_size: 0,
+        created_at: new Date().toISOString(),
+        base64: url.includes('base64') ? url : undefined
+      }));
+      setAttachments(defaultAttachments);
+    }
+  }, [transaction?.id, transaction?.attachment_url]);
+
   if (!transaction) return null;
 
   const punctuality = calculatePunctuality(transaction.due_date, transaction.paid_date);
@@ -158,30 +182,6 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
     setIsEditing(false);
     onClose();
   };
-
-  const loadAttachments = useCallback(() => {
-    if (transaction.attachment_url) {
-      const savedAttachments = localStorage.getItem(`likinex_attachments_${transaction.id}`);
-      if (savedAttachments) {
-        setAttachments(JSON.parse(savedAttachments));
-      } else {
-        const urls = transaction.attachment_url.split(',').filter(Boolean);
-        const defaultAttachments: AttachmentWithPreview[] = urls.map((url, i) => ({
-          id: `default_${i}`,
-          transaction_id: transaction.id,
-          file_name: url.includes('base64') ? 'archivo_adjunto' : url.split('/').pop() || 'archivo',
-          file_path: url,
-          file_type: url.includes('base64') ? 'image/png' : 'application/pdf',
-          file_size: 0,
-          created_at: new Date().toISOString(),
-          base64: url.includes('base64') ? url : undefined
-        }));
-        setAttachments(defaultAttachments);
-      }
-    } else {
-      setAttachments([]);
-    }
-  }, [transaction.id, transaction.attachment_url]);
 
   const saveAttachments = (newAttachments: AttachmentWithPreview[]) => {
     setAttachments(newAttachments);
