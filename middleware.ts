@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 
 const protectedPaths = ['/app'];
 const apiProtectedPaths = ['/api'];
-const publicApiPaths = ['/api/notifications'];
+const publicApiPaths = ['/api/notifications', '/api/migrate'];
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
