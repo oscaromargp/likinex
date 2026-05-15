@@ -6,7 +6,7 @@ import { Mail, Lock, User, Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle, Aler
 import { useAuth } from '@/lib/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-type AuthMode = 'login' | 'register' | 'recoverPassword' | 'recoverUsername';
+type AuthMode = 'login' | 'register' | 'recoverPassword';
 
 interface ToastMessage {
   id: string;
@@ -22,12 +22,6 @@ const fadeInUp = {
   exit: { opacity: 0, y: -20 }
 };
 
-const slideIn = {
-  initial: { opacity: 0, x: -20 },
-  animate: { opacity: 1, x: 0 },
-  exit: { opacity: 0, x: 20 }
-};
-
 function ToastContainer({ toasts, onDismiss }: { toasts: ToastMessage[]; onDismiss: (id: string) => void }) {
   return (
     <div className="fixed top-4 right-4 z-50 space-y-3 max-w-sm">
@@ -39,8 +33,8 @@ function ToastContainer({ toasts, onDismiss }: { toasts: ToastMessage[]; onDismi
             animate={{ opacity: 1, x: 0, scale: 1 }}
             exit={{ opacity: 0, x: 100, scale: 0.9 }}
             className={`p-4 rounded-xl border shadow-2xl backdrop-blur-xl ${
-              toast.type === 'success' 
-                ? 'bg-emerald-500/20 border-emerald-500/30' 
+              toast.type === 'success'
+                ? 'bg-emerald-500/20 border-emerald-500/30'
                 : toast.type === 'error'
                 ? 'bg-red-500/20 border-red-500/30'
                 : 'bg-indigo-500/20 border-indigo-500/30'
@@ -95,52 +89,7 @@ function AnimatedBackground() {
         transition={{ duration: 6, repeat: Infinity }}
         className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl"
       />
-      <motion.div
-        animate={{
-          x: [0, 30, 0],
-          y: [0, -20, 0],
-        }}
-        transition={{ duration: 10, repeat: Infinity }}
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-radial from-emerald-500/5 to-transparent rounded-full"
-      />
     </div>
-  );
-}
-
-function ModeCard({ 
-  mode, 
-  isActive, 
-  onClick, 
-  icon: Icon, 
-  title, 
-  description 
-}: { 
-  mode: AuthMode; 
-  isActive: boolean; 
-  onClick: () => void; 
-  icon: React.ElementType; 
-  title: string; 
-  description: string;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full p-4 rounded-xl border transition-all duration-300 text-left group ${
-        isActive 
-          ? 'bg-emerald-500/20 border-emerald-500/40' 
-          : 'bg-slate-800/30 border-slate-700/50 hover:border-emerald-500/30 hover:bg-slate-800/50'
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <div className={`p-2 rounded-lg ${isActive ? 'bg-emerald-500/30' : 'bg-slate-700/50 group-hover:bg-emerald-500/20'} transition-colors`}>
-          <Icon className={`w-5 h-5 ${isActive ? 'text-emerald-300' : 'text-slate-400 group-hover:text-emerald-400'}`} />
-        </div>
-        <div>
-          <h3 className={`font-semibold ${isActive ? 'text-white' : 'text-slate-300'}`}>{title}</h3>
-          <p className="text-xs text-slate-500">{description}</p>
-        </div>
-      </div>
-    </button>
   );
 }
 
@@ -152,18 +101,19 @@ function AuthContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showInfoCard, setShowInfoCard] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-  
-  const { login, register, recoverPassword, recoverUsername } = useAuth();
+
+  const { signIn, signUp, resetPassword, message, clearMessage } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const from = searchParams.get('from') || '/app';
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowInfoCard(true), 500);
-    return () => clearTimeout(timer);
-  }, []);
+    if (message) {
+      addToast(message.type, message.title, message.message);
+      clearMessage();
+    }
+  }, [message, clearMessage]);
 
   const addToast = (type: 'success' | 'error' | 'info', title: string, message: string, duration = 5000) => {
     const id = Date.now().toString();
@@ -183,16 +133,12 @@ function AuthContent() {
     setLoading(true);
 
     try {
-      let success: boolean;
-      
       if (mode === 'login') {
-        success = await login(email, password);
-        if (!success) {
-          setError('Email o contraseña incorrectos. Por favor verifica tus credenciales.');
-          addToast('error', 'Error de Acceso', 'Las credenciales proporcionadas no son correctas. Por favor intenta de nuevo.');
+        const result = await signIn(email, password);
+        if (!result.success) {
+          setError(result.error || 'Email o contraseña incorrectos.');
         } else {
-          addToast('success', '¡Bienvenido de Nuevo!', `Hola ${email.split('@')[0]}! Es un placer tenerte de vuelta en LikinEX.`);
-          setTimeout(() => router.push(from), 1500);
+          setTimeout(() => router.push(from), 1000);
         }
       } else if (mode === 'register') {
         if (!name.trim()) {
@@ -200,29 +146,16 @@ function AuthContent() {
           setLoading(false);
           return;
         }
-        success = await register(email, password, name);
-        if (!success) {
-          setError('El email ya está registrado. ¿Quizás quieres iniciar sesión?');
-          addToast('error', 'Cuenta Existente', 'Ya existe una cuenta con este correo electrónico.');
+        const result = await signUp(email, password, name);
+        if (!result.success) {
+          setError(result.error || 'No se pudo crear la cuenta.');
         } else {
-          addToast('success', '¡Cuenta Creada!', `Bienvenido ${name} a LikinEX. Tu cuenta ha sido creada exitosamente.`);
-          setTimeout(() => router.push(from), 1500);
+          setTimeout(() => router.push(from), 1000);
         }
       } else if (mode === 'recoverPassword') {
-        const result = await recoverPassword(email);
-        if (result.success) {
-          addToast('success', '¡Contraseña Recuperada!', 'Tu contraseña ha sido mostrada. Por favor revisa el mensaje.');
-          setTimeout(() => setMode('login'), 3000);
-        } else {
-          addToast('error', 'Usuario No Encontrado', 'El correo electrónico no está registrado en nuestro sistema.');
-        }
-      } else if (mode === 'recoverUsername') {
-        const result = await recoverUsername(email);
-        if (result.success) {
-          addToast('success', '¡Usuario Recuperado!', 'Tu nombre de usuario ha sido mostrado. Por favor revisa el mensaje.');
-          setTimeout(() => setMode('login'), 3000);
-        } else {
-          addToast('error', 'Correo No Encontrado', 'No encontramos ninguna cuenta asociada a este correo.');
+        const result = await resetPassword(email);
+        if (!result.success) {
+          setError(result.error || 'No se pudo enviar el email.');
         }
       }
     } catch (err) {
@@ -238,7 +171,6 @@ function AuthContent() {
       case 'login': return 'Bienvenido de nuevo';
       case 'register': return 'Crea tu cuenta';
       case 'recoverPassword': return 'Recupera tu contraseña';
-      case 'recoverUsername': return 'Recupera tu usuario';
     }
   };
 
@@ -246,8 +178,7 @@ function AuthContent() {
     switch (mode) {
       case 'login': return 'Ingresa tus credenciales para acceder';
       case 'register': return 'Únete a LikinEX y toma control de tus finanzas';
-      case 'recoverPassword': return 'Ingresa tu email para recuperar tu contraseña';
-      case 'recoverUsername': return 'Ingresa tu email para recuperar tu usuario';
+      case 'recoverPassword': return 'Ingresa tu email para recibir un link de recuperación';
     }
   };
 
@@ -274,7 +205,7 @@ function AuthContent() {
           >
             <span className="text-4xl">💰</span>
           </motion.div>
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3 }}
@@ -282,7 +213,7 @@ function AuthContent() {
           >
             LikinEX
           </motion.h1>
-          <motion.p 
+          <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.4 }}
@@ -301,20 +232,10 @@ function AuthContent() {
             transition={{ duration: 0.2 }}
             className="bg-slate-900/60 backdrop-blur-2xl border border-slate-800/60 rounded-2xl p-6 shadow-2xl"
           >
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={`card-${mode}`}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="mb-6"
-              >
-                <p className="text-sm text-slate-400 text-center">{getModeDescription()}</p>
-              </motion.div>
-            </AnimatePresence>
+            <p className="text-sm text-slate-400 text-center mb-6">{getModeDescription()}</p>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {mode !== 'recoverPassword' && mode !== 'recoverUsername' && (
+              {mode === 'register' && (
                 <div>
                   <label className="block text-sm text-slate-400 mb-2">Nombre</label>
                   <div className="relative">
@@ -323,10 +244,10 @@ function AuthContent() {
                       type="text"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      placeholder={mode === 'register' ? "Tu nombre completo" : "Nombre"}
-                      disabled={mode === 'login'}
+                      placeholder="Tu nombre completo"
+                      required
                       autoComplete="name"
-                      className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                      className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 transition-all"
                     />
                   </div>
                 </div>
@@ -348,7 +269,7 @@ function AuthContent() {
                 </div>
               </div>
 
-              {mode !== 'recoverPassword' && mode !== 'recoverUsername' && (
+              {mode !== 'recoverPassword' && (
                 <div>
                   <label className="block text-sm text-slate-400 mb-2">Contraseña</label>
                   <div className="relative">
@@ -359,7 +280,7 @@ function AuthContent() {
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
                       required
-                      autoComplete="current-password"
+                      autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                       className="w-full pl-10 pr-12 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 transition-all"
                     />
                     <button
@@ -397,8 +318,7 @@ function AuthContent() {
                   <>
                     {mode === 'login' && 'Iniciar Sesión'}
                     {mode === 'register' && 'Crear Cuenta'}
-                    {mode === 'recoverPassword' && 'Recuperar Contraseña'}
-                    {mode === 'recoverUsername' && 'Recuperar Usuario'}
+                    {mode === 'recoverPassword' && 'Enviar Link de Recuperación'}
                     <ArrowRight className="w-5 h-5" />
                   </>
                 )}
@@ -416,18 +336,12 @@ function AuthContent() {
                       <span className="px-2 bg-slate-900/60 text-slate-500">Opciones de recuperación</span>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="text-center">
                     <button
-                      onClick={() => { setMode('recoverPassword'); addToast('info', 'Recuperación', 'Ingresa tu correo para recuperar tu contraseña.'); }}
+                      onClick={() => setMode('recoverPassword')}
                       className="text-xs text-slate-400 hover:text-emerald-400 transition-colors py-2"
                     >
                       ¿Olvidaste tu contraseña?
-                    </button>
-                    <button
-                      onClick={() => { setMode('recoverUsername'); addToast('info', 'Recuperación', 'Ingresa tu correo para recuperar tu usuario.'); }}
-                      className="text-xs text-slate-400 hover:text-emerald-400 transition-colors py-2"
-                    >
-                      ¿Olvidaste tu usuario?
                     </button>
                   </div>
                 </>
@@ -438,16 +352,16 @@ function AuthContent() {
                   <p className="text-slate-500 text-sm">
                     ¿No tienes cuenta?{' '}
                     <button
-                      onClick={() => { setMode('register'); addToast('info', 'Nuevo Usuario', 'Completa el formulario para crear tu cuenta.'); }}
+                      onClick={() => setMode('register')}
                       className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
                     >
                       Regístrate gratis
                     </button>
                   </p>
                 )}
-                {(mode === 'register' || mode === 'recoverPassword' || mode === 'recoverUsername') && (
+                {(mode === 'register' || mode === 'recoverPassword') && (
                   <button
-                    onClick={() => { setMode('login'); addToast('info', 'Inicio de Sesión', 'Ingresa tus credenciales para continuar.'); }}
+                    onClick={() => setMode('login')}
                     className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors flex items-center justify-center gap-2 text-sm"
                   >
                     <ArrowLeft className="w-4 h-4" />
@@ -459,7 +373,7 @@ function AuthContent() {
           </motion.div>
         </AnimatePresence>
 
-        <motion.p 
+        <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6 }}

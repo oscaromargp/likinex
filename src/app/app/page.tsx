@@ -15,26 +15,86 @@ import RiskToleranceEngine from '@/components/RiskToleranceEngine';
 import CashFlowForecast from '@/components/CashFlowForecast';
 import { Transaction, CalendarEvent, EntityConfig, DEFAULT_ENTITIES } from '@/types';
 import { mockCreditCards } from '@/lib/mockData';
-import { userTransactions, calculateMetrics, generateCalendarEvents } from '@/lib/userData';
+import { calculateMetrics, generateCalendarEvents } from '@/lib/userData';
 import { getSmartAlerts } from '@/components/RiskToleranceEngine';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/useTheme';
+import { useTransactions, useCreateTransaction, useUpdateTransaction, useDeleteTransaction, type TransactionDB } from '@/hooks/useTransactions';
+import { useEntities, useCreateEntity, useUpdateEntity, useDeleteEntity } from '@/hooks/useEntities';
+import { useCategories, useCreateCategory, useDeleteCategory } from '@/hooks/useCategories';
+
+function mapDBToTransaction(db: TransactionDB): Transaction {
+  return {
+    id: db.id,
+    template_id: db.template_id || undefined,
+    user_id: db.user_id,
+    entity: db.entity,
+    description: db.description,
+    amount: db.amount,
+    due_date: db.due_date,
+    paid_date: db.paid_date || undefined,
+    status: db.status as Transaction['status'],
+    recurrence: db.recurrence as Transaction['recurrence'],
+    recurrence_day: db.recurrence_day || undefined,
+    payment_method: db.payment_method as Transaction['payment_method'],
+    category: db.category as Transaction['category'],
+    notes: db.notes || undefined,
+    follow_up: db.follow_up || undefined,
+    attachment_url: db.attachment_url || undefined,
+    price_change: db.price_change || undefined,
+    created_at: db.created_at,
+    updated_at: db.updated_at,
+  };
+}
+
+function mapTransactionToDB(tx: Transaction, userId: string): Omit<TransactionDB, 'id' | 'created_at' | 'updated_at'> {
+  return {
+    user_id: userId,
+    template_id: tx.template_id || null,
+    entity: tx.entity,
+    description: tx.description,
+    amount: tx.amount,
+    currency: 'MXN',
+    due_date: tx.due_date,
+    paid_date: tx.paid_date || null,
+    status: tx.status,
+    recurrence: tx.recurrence,
+    recurrence_day: tx.recurrence_day || null,
+    payment_method: tx.payment_method || null,
+    category: tx.category || null,
+    notes: tx.notes || null,
+    follow_up: tx.follow_up || null,
+    attachment_url: tx.attachment_url || null,
+    price_change: tx.price_change || null,
+  };
+}
 
 function DashboardContent() {
-  const { user, logout, isLoading: authLoading, isDemo } = useAuth();
+  const { user, signOut, isLoading: authLoading, isDemo } = useAuth();
   const { resolvedTheme } = useTheme();
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   const [activeView, setActiveView] = useState<'dashboard' | 'calendar' | 'ledger' | 'settings'>('dashboard');
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [entities, setEntities] = useState<EntityConfig[]>([]);
   const [showPDFReport, setShowPDFReport] = useState(false);
   const [printFilters, setPrintFilters] = useState({ dateRange: { start: null as string | null, end: null as string | null }, entity: 'all' as any });
+
+  const { data: dbTransactions = [], isLoading: loadingTransactions } = useTransactions(user?.id);
+  const createTransaction = useCreateTransaction();
+  const updateTransaction = useUpdateTransaction();
+  const deleteTransaction = useDeleteTransaction();
+
+  const { data: dbEntities = [] } = useEntities(user?.id);
+  const createEntity = useCreateEntity();
+  const updateEntity = useUpdateEntity();
+  const deleteEntity = useDeleteEntity();
+
+  const { data: dbCategories = [] } = useCategories(user?.id);
+  const createCategory = useCreateCategory();
+  const deleteCategory = useDeleteCategory();
 
   useEffect(() => {
     if (!authLoading && !user && !isDemo) {
@@ -42,45 +102,29 @@ function DashboardContent() {
     }
   }, [user, authLoading, router, isDemo]);
 
-  useEffect(() => {
-    if (user || isDemo) {
-      const userKey = `likinex_transactions_${user?.id || 'demo'}`;
-      const saved = localStorage.getItem(userKey);
-      if (saved) {
-        setTransactions(JSON.parse(saved));
-      } else {
-        setTransactions(userTransactions);
-        localStorage.setItem(userKey, JSON.stringify(userTransactions));
-      }
-
-      const savedCategories = localStorage.getItem(`likinex_categories_${user?.id || 'demo'}`);
-      if (savedCategories) {
-        setCategories(JSON.parse(savedCategories));
-      }
-
-      const savedEntities = localStorage.getItem(`likinex_entities_${user?.id || 'demo'}`);
-      if (savedEntities) {
-        setEntities(JSON.parse(savedEntities));
-      } else {
-        setEntities(DEFAULT_ENTITIES);
-        localStorage.setItem(`likinex_entities_${user?.id || 'demo'}`, JSON.stringify(DEFAULT_ENTITIES));
-      }
+  const transactions: Transaction[] = useMemo(() => {
+    if (isDemo) {
+      const { userTransactions } = require('@/lib/userData');
+      return userTransactions;
     }
-  }, [user, isDemo]);
+    return dbTransactions.map(mapDBToTransaction);
+  }, [dbTransactions, isDemo]);
 
-  useEffect(() => {
-    const tab = searchParams.get('tab');
-    if (tab === 'settings') {
-      setActiveView('settings');
-    }
-  }, [searchParams]);
+  const entities: EntityConfig[] = useMemo(() => {
+    if (isDemo) return DEFAULT_ENTITIES;
+    return dbEntities.map(e => ({
+      id: e.id,
+      name: e.name,
+      icon: e.icon,
+      color: e.color,
+      is_active: e.is_active,
+    }));
+  }, [dbEntities, isDemo]);
 
-  const saveTransactions = (newTransactions: Transaction[]) => {
-    setTransactions(newTransactions);
-    if (user) {
-      localStorage.setItem(`likinex_transactions_${user.id}`, JSON.stringify(newTransactions));
-    }
-  };
+  const categories: string[] = useMemo(() => {
+    if (isDemo) return [];
+    return dbCategories.map(c => c.name);
+  }, [dbCategories, isDemo]);
 
   const metrics = calculateMetrics(transactions);
   const calendarEvents = generateCalendarEvents(transactions);
@@ -107,9 +151,15 @@ function DashboardContent() {
     setIsDrawerOpen(true);
   };
 
-  const handleUpdateTransaction = (updated: Transaction) => {
-    const newTransactions = transactions.map(t => t.id === updated.id ? updated : t);
-    saveTransactions(newTransactions);
+  const handleUpdateTransaction = async (updated: Transaction) => {
+    if (isDemo) return;
+    if (!user) return;
+
+    if (updated.id.startsWith('new_')) {
+      await createTransaction.mutateAsync(mapTransactionToDB(updated, user.id));
+    } else {
+      await updateTransaction.mutateAsync({ id: updated.id, ...mapTransactionToDB(updated, user.id) });
+    }
   };
 
   const handleEventClick = (event: CalendarEvent) => {
@@ -136,17 +186,19 @@ function DashboardContent() {
     setIsDrawerOpen(true);
   };
 
-  const handleImport = (imported: Partial<Transaction>[]) => {
-    const newTransactions = imported.map((t, i) => ({
+  const handleImport = async (imported: Partial<Transaction>[]) => {
+    if (isDemo || !user) return;
+    const newTransactions = imported.map((t) => ({
       ...t,
-      id: `imported_${Date.now()}_${i}`,
-      user_id: user?.id,
+      id: `imported_${Date.now()}_${Math.random()}`,
+      user_id: user.id,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     } as Transaction));
-    
-    const all = [...transactions, ...newTransactions];
-    saveTransactions(all);
+
+    for (const tx of newTransactions) {
+      await createTransaction.mutateAsync(mapTransactionToDB(tx, user.id));
+    }
   };
 
   const handleExport = () => {
@@ -154,7 +206,7 @@ function DashboardContent() {
     transactions.forEach(t => {
       headers.push(`${t.entity},"${t.description}",${t.amount},${t.due_date},${t.recurrence},${t.status},"${t.notes || ''}"`);
     });
-    
+
     const csv = headers.join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -174,50 +226,55 @@ function DashboardContent() {
     }, 300);
   };
 
-  const handleAddCategory = (category: string) => {
-    const newCategories = [...categories, category];
-    setCategories(newCategories);
-    if (user) {
-      localStorage.setItem(`likinex_categories_${user.id}`, JSON.stringify(newCategories));
+  const handleAddCategory = async (category: string) => {
+    if (isDemo || !user) return;
+    await createCategory.mutateAsync({
+      user_id: user.id,
+      name: category,
+      icon: '📁',
+      color: 'emerald',
+      type: 'expense',
+    });
+  };
+
+  const handleDeleteCategory = async (category: string) => {
+    if (isDemo || !user) return;
+    const cat = dbCategories.find(c => c.name === category);
+    if (cat) {
+      await deleteCategory.mutateAsync({ id: cat.id, userId: user.id });
     }
   };
 
-  const handleDeleteCategory = (category: string) => {
-    const newCategories = categories.filter(c => c !== category);
-    setCategories(newCategories);
-    if (user) {
-      localStorage.setItem(`likinex_categories_${user.id}`, JSON.stringify(newCategories));
-    }
+  const handleAddEntity = async (entity: Omit<EntityConfig, 'id'>) => {
+    if (isDemo || !user) return;
+    await createEntity.mutateAsync({
+      user_id: user.id,
+      name: entity.name,
+      icon: entity.icon,
+      color: entity.color,
+      type: 'personal',
+      is_active: true,
+    });
   };
 
-  const handleAddEntity = (entity: Omit<EntityConfig, 'id'>) => {
-    const id = entity.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
-    const newEntity: EntityConfig = { ...entity, id };
-    const newEntities = [...entities, newEntity];
-    setEntities(newEntities);
-    if (user) {
-      localStorage.setItem(`likinex_entities_${user.id}`, JSON.stringify(newEntities));
-    }
+  const handleUpdateEntity = async (entity: EntityConfig) => {
+    if (isDemo || !user) return;
+    await updateEntity.mutateAsync({
+      id: entity.id,
+      name: entity.name,
+      icon: entity.icon,
+      color: entity.color,
+      is_active: entity.is_active,
+    });
   };
 
-  const handleUpdateEntity = (entity: EntityConfig) => {
-    const newEntities = entities.map(e => e.id === entity.id ? entity : e);
-    setEntities(newEntities);
-    if (user) {
-      localStorage.setItem(`likinex_entities_${user.id}`, JSON.stringify(newEntities));
-    }
+  const handleDeleteEntity = async (id: string) => {
+    if (isDemo || !user) return;
+    await deleteEntity.mutateAsync({ id, userId: user.id });
   };
 
-  const handleDeleteEntity = (id: string) => {
-    const newEntities = entities.filter(e => e.id !== id);
-    setEntities(newEntities);
-    if (user) {
-      localStorage.setItem(`likinex_entities_${user.id}`, JSON.stringify(newEntities));
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await signOut();
     if (isDemo) {
       router.push('/?demo=false');
     } else {
@@ -225,7 +282,7 @@ function DashboardContent() {
     }
   };
 
-  if (authLoading || (!user && !isDemo)) {
+  if (authLoading || loadingTransactions || (!user && !isDemo)) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
@@ -294,7 +351,7 @@ function DashboardContent() {
           </nav>
 
           <div className="p-4 border-t border-[var(--border-subtle)]">
-            <button 
+            <button
               onClick={handleLogout}
               className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[var(--text-muted)] hover:bg-red-500/10 hover:text-red-400 transition-all"
             >
@@ -342,7 +399,7 @@ function DashboardContent() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div>
                     <h3 className="text-xl font-bold text-white mb-4">Calendario</h3>
-<CalendarComponent events={calendarEvents} onEventClick={handleEventClick} onDateDoubleClick={handleDateDoubleClick} />
+                    <CalendarComponent events={calendarEvents} onEventClick={handleEventClick} onDateDoubleClick={handleDateDoubleClick} />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-white mb-4">Transacciones Recientes</h3>
@@ -381,17 +438,17 @@ function DashboardContent() {
 
                 <div className="space-y-8">
                   <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6">
-                    <CashFlowForecast 
-                      transactions={transactions} 
-                      liquidity={metrics} 
+                    <CashFlowForecast
+                      transactions={transactions}
+                      liquidity={metrics}
                       daysAhead={30}
                     />
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                     <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6">
-                      <CreditCardEngine 
-                        cards={mockCreditCards} 
+                      <CreditCardEngine
+                        cards={mockCreditCards}
                         currentBalance={metrics.available}
                       />
                     </div>
@@ -426,7 +483,7 @@ function DashboardContent() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <SettingsComponent 
+                <SettingsComponent
                   transactions={transactions}
                   onImport={handleImport}
                   onExport={handleExport}

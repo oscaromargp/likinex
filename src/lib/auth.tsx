@@ -1,7 +1,16 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '@/types';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { supabase } from '@/lib/supabase';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
+import { useRouter } from 'next/navigation';
+
+export interface LikinexUser {
+  id: string;
+  email: string;
+  name?: string;
+  created_at: string;
+}
 
 interface AuthMessage {
   type: 'success' | 'error' | 'info';
@@ -10,15 +19,15 @@ interface AuthMessage {
 }
 
 interface AuthContextType {
-  user: User | null;
+  user: LikinexUser | null;
+  supabaseUser: SupabaseUser | null;
   isLoading: boolean;
   isDemo: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  register: (email: string, password: string, name?: string) => Promise<boolean>;
-  logout: () => void;
+  signUp: (email: string, password: string, name?: string) => Promise<{ success: boolean; error?: string }>;
+  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signOut: () => Promise<void>;
   enterDemoMode: () => void;
-  recoverPassword: (email: string) => Promise<{ success: boolean; message: string }>;
-  recoverUsername: (email: string) => Promise<{ success: boolean; message: string }>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   message: AuthMessage | null;
   clearMessage: () => void;
 }
@@ -26,193 +35,178 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<LikinexUser | null>(null);
+  const [supabaseUser, setSupabaseUser] = useState<SupabaseUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDemo, setIsDemo] = useState(false);
   const [message, setMessage] = useState<AuthMessage | null>(null);
+  const router = useRouter();
+
+  const mapSupabaseUser = useCallback((sbUser: SupabaseUser | null): LikinexUser | null => {
+    if (!sbUser) return null;
+    return {
+      id: sbUser.id,
+      email: sbUser.email || '',
+      name: sbUser.user_metadata?.name || sbUser.email?.split('@')[0] || '',
+      created_at: sbUser.created_at,
+    };
+  }, []);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
     if (urlParams.get('demo') === 'true') {
       setIsDemo(true);
-      const demoUser = {
+      const demoUser: LikinexUser = {
         id: 'demo_user',
         email: 'demo@likinex.app',
         name: 'Usuario Demo',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
       };
       setUser(demoUser);
-      localStorage.setItem('likinex_user', JSON.stringify(demoUser));
+      setIsLoading(false);
+      return;
     }
 
-    let users = JSON.parse(localStorage.getItem('likinex_users') || '[]');
-    const defaultUser = {
-      id: 'user_default',
-      email: 'oscaromargp@gmail.com',
-      name: 'Oscar',
-      password: 'Carlo$0311++',
-      created_at: new Date().toISOString()
-    };
-    if (!users.find((u: any) => u.email === 'oscaromargp@gmail.com')) {
-      users.push(defaultUser);
-      localStorage.setItem('likinex_users', JSON.stringify(users));
-    }
-    
-    const savedUser = localStorage.getItem('likinex_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
-    }
-    setIsLoading(false);
-  }, []);
-
-  const login = async (email: string, password: string): Promise<boolean> => {
-    setIsLoading(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    let users = JSON.parse(localStorage.getItem('likinex_users') || '[]');
-    
-    const defaultUser = {
-      id: 'user_default',
-      email: 'oscaromargp@gmail.com',
-      name: 'Oscar',
-      password: 'Carlo$0311++',
-      created_at: new Date().toISOString()
-    };
-    
-    if (email === 'oscaromargp@gmail.com' && password === 'Carlo$0311++') {
-      if (!users.find((u: any) => u.email === 'oscaromargp@gmail.com')) {
-        users.push(defaultUser);
-        localStorage.setItem('likinex_users', JSON.stringify(users));
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        setSupabaseUser(session.user);
+        setUser(mapSupabaseUser(session.user));
       }
-      const userData = { id: defaultUser.id, email: defaultUser.email, name: defaultUser.name, created_at: defaultUser.created_at };
-      setUser(userData);
-      localStorage.setItem('likinex_user', JSON.stringify(userData));
       setIsLoading(false);
-      return true;
-    }
-    
-    const foundUser = users.find((u: User & { password: string }) => u.email === email);
-    
-    if (foundUser && foundUser.password === password) {
-      const { password: _, ...userWithoutPassword } = foundUser;
-      setUser(userWithoutPassword);
-      localStorage.setItem('likinex_user', JSON.stringify(userWithoutPassword));
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setSupabaseUser(session.user);
+        setUser(mapSupabaseUser(session.user));
+      } else {
+        setSupabaseUser(null);
+        setUser(null);
+      }
       setIsLoading(false);
-      return true;
+    });
+
+    return () => subscription.unsubscribe();
+  }, [mapSupabaseUser]);
+
+  const signUp = async (email: string, password: string, name?: string) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: { name: name || email.split('@')[0] },
+        },
+      });
+
+      if (error) {
+        setMessage({ type: 'error', title: 'Error de Registro', message: error.message });
+        return { success: false, error: error.message };
+      }
+
+      if (data.user) {
+        setSupabaseUser(data.user);
+        setUser(mapSupabaseUser(data.user));
+        setMessage({ type: 'success', title: '¡Cuenta Creada!', message: 'Bienvenido a LikinEX.' });
+        return { success: true };
+      }
+
+      return { success: false, error: 'No se pudo crear la cuenta' };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error inesperado';
+      setMessage({ type: 'error', title: 'Error', message: msg });
+      return { success: false, error: msg };
     }
-    
-    setIsLoading(false);
-    return false;
   };
 
-  const register = async (email: string, password: string, name?: string): Promise<boolean> => {
-    setIsLoading(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    const users = JSON.parse(localStorage.getItem('likinex_users') || '[]');
-    
-    if (users.find((u: User & { password: string }) => u.email === email)) {
-      setIsLoading(false);
-      return false;
+  const signIn = async (email: string, password: string) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) {
+        setMessage({ type: 'error', title: 'Error de Acceso', message: 'Email o contraseña incorrectos.' });
+        return { success: false, error: error.message };
+      }
+
+      if (data.user) {
+        setSupabaseUser(data.user);
+        setUser(mapSupabaseUser(data.user));
+        setMessage({ type: 'success', title: '¡Bienvenido!', message: `Hola ${data.user.email}` });
+        return { success: true };
+      }
+
+      return { success: false, error: 'No se pudo iniciar sesión' };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error inesperado';
+      setMessage({ type: 'error', title: 'Error', message: msg });
+      return { success: false, error: msg };
     }
-    
-    const newUser: User & { password: string } = {
-      id: `user_${Date.now()}`,
-      email,
-      name: name || email.split('@')[0],
-      password,
-      created_at: new Date().toISOString()
-    };
-    
-    users.push(newUser);
-    localStorage.setItem('likinex_users', JSON.stringify(users));
-    
-    const { password: _, ...userWithoutPassword } = newUser;
-    setUser(userWithoutPassword);
-    localStorage.setItem('likinex_user', JSON.stringify(userWithoutPassword));
-    
-    setIsLoading(false);
-    return true;
   };
 
-  const logout = () => {
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setSupabaseUser(null);
     setUser(null);
     setIsDemo(false);
-    localStorage.removeItem('likinex_user');
+    setMessage({ type: 'info', title: 'Sesión Cerrada', message: 'Has cerrado sesión exitosamente.' });
   };
 
   const enterDemoMode = () => {
     setIsDemo(true);
-    const demoUser = {
+    const demoUser: LikinexUser = {
       id: 'demo_user',
       email: 'demo@likinex.app',
       name: 'Usuario Demo',
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
     setUser(demoUser);
-    localStorage.setItem('likinex_user', JSON.stringify(demoUser));
   };
 
-  const recoverPassword = async (email: string): Promise<{ success: boolean; message: string }> => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const users = JSON.parse(localStorage.getItem('likinex_users') || '[]');
-    const foundUser = users.find((u: User & { password: string }) => u.email === email);
-    
-    setIsLoading(false);
-    
-    if (foundUser) {
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth?reset=true`,
+      });
+
+      if (error) {
+        setMessage({ type: 'error', title: 'Error', message: error.message });
+        return { success: false, error: error.message };
+      }
+
       setMessage({
         type: 'success',
-        title: 'Contraseña Recuperada',
-        message: `Tu contraseña es: ${foundUser.password}\n\nRecuerda guardarla en un lugar seguro.`
+        title: 'Email Enviado',
+        message: 'Revisa tu correo para restablecer tu contraseña.',
       });
-      return { success: true, message: 'Contraseña recuperada exitosamente' };
-    } else {
-      setMessage({
-        type: 'error',
-        title: 'Usuario No Encontrado',
-        message: 'El correo electrónico no está registrado en nuestro sistema.'
-      });
-      return { success: false, message: 'El email no está registrado' };
+      return { success: true };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error inesperado';
+      setMessage({ type: 'error', title: 'Error', message: msg });
+      return { success: false, error: msg };
     }
   };
 
-  const recoverUsername = async (email: string): Promise<{ success: boolean; message: string }> => {
-    setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const users = JSON.parse(localStorage.getItem('likinex_users') || '[]');
-    const foundUser = users.find((u: User & { password: string }) => u.email === email);
-    
-    setIsLoading(false);
-    
-    if (foundUser) {
-      setMessage({
-        type: 'success',
-        title: 'Usuario Recuperado',
-        message: `Tu usuario es: ${foundUser.name}\n\n¡Bienvenido de nuevo!`
-      });
-      return { success: true, message: 'Usuario recuperado exitosamente' };
-    } else {
-      setMessage({
-        type: 'error',
-        title: 'Correo No Encontrado',
-        message: 'No encontramos ninguna cuenta asociada a este correo electrónico.'
-      });
-      return { success: false, message: 'El email no está registrado' };
-    }
-  };
-
-  const clearMessage = () => {
-    setMessage(null);
-  };
+  const clearMessage = () => setMessage(null);
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isDemo, login, register, logout, enterDemoMode, recoverPassword, recoverUsername, message, clearMessage }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        supabaseUser,
+        isLoading,
+        isDemo,
+        signUp,
+        signIn,
+        signOut,
+        enterDemoMode,
+        resetPassword,
+        message,
+        clearMessage,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

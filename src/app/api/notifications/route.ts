@@ -13,9 +13,13 @@ function getSupabaseClient() {
   return supabase;
 }
 
-const N8N_API_KEY = process.env.N8N_API_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIzYzE4MDdkZS0xMTI4LTQ1OTgtYjE5OS1mZjQ2ZmIwZGYzODUiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYTVjMDYyMTMtYTQ3OS00MWNiLWI4ZWUtZDBlMjIxNzAxNTYyIiwiaWF0IjoxNzc4ODA3MTU3fQ.YSuBJJjuNl9NGhBJxF9nwvunsZW3TxdgOkLanxcwcpo';
-const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || 'https://n8n.antigravity.com.mx/webhook/likinex-notifications';
+const N8N_API_KEY = process.env.N8N_API_KEY;
+const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL;
 const DEFAULT_WHATSAPP_PHONE = process.env.DEFAULT_WHATSAPP_PHONE || '6121077805';
+
+if (!N8N_API_KEY || !N8N_WEBHOOK_URL) {
+  console.warn('N8N_API_KEY or N8N_WEBHOOK_URL not configured');
+}
 
 interface NotificationPayload {
   type: 'payment_reminder' | 'payment_due' | 'payment_overdue' | 'cashflow_alert' | 'card_alert';
@@ -29,6 +33,11 @@ interface NotificationPayload {
 }
 
 async function sendToN8N(payload: NotificationPayload) {
+  if (!N8N_WEBHOOK_URL || !N8N_API_KEY) {
+    console.warn('N8N not configured, skipping notification send');
+    return false;
+  }
+
   try {
     const response = await fetch(N8N_WEBHOOK_URL, {
       method: 'POST',
