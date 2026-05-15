@@ -2,8 +2,8 @@
 
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, Shield, Clock, Flame } from 'lucide-react';
-import { Transaction, ServiceTolerance, DEFAULT_TOLERANCES } from '@/types';
+import { AlertTriangle, Shield, Clock, Flame, CalendarClock, AlertCircle, TimerOff } from 'lucide-react';
+import { Transaction, ServiceTolerance, DEFAULT_TOLERANCES, SmartAlert } from '@/types';
 import { formatDateInput, cn } from '@/lib/utils';
 
 interface RiskToleranceEngineProps {
@@ -17,8 +17,65 @@ interface RiskAlert {
   severity: 'critical' | 'warning' | 'safe';
 }
 
+function calculateSmartAlert(transaction: Transaction, today: Date): SmartAlert | null {
+  if (transaction.status !== 'pending') return null;
+
+  const dueDate = new Date(transaction.due_date);
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const dueStart = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+  const diffDays = Math.round((dueStart.getTime() - todayStart.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    return {
+      transaction,
+      type: 'overdue',
+      label: 'Vencido',
+      severity: 'error'
+    };
+  }
+
+  if (diffDays === 0) {
+    return {
+      transaction,
+      type: 'due_today',
+      label: 'Vence hoy',
+      severity: 'critical'
+    };
+  }
+
+  if (diffDays <= 2) {
+    return {
+      transaction,
+      type: 'upcoming',
+      label: 'Pronto a vencer',
+      severity: 'info'
+    };
+  }
+
+  return null;
+}
+
+export function getSmartAlerts(transactions: Transaction[]): SmartAlert[] {
+  const today = new Date();
+  const alerts: SmartAlert[] = [];
+
+  transactions.forEach(t => {
+    const alert = calculateSmartAlert(t, today);
+    if (alert) {
+      alerts.push(alert);
+    }
+  });
+
+  return alerts.sort((a, b) => {
+    const severityOrder = { error: 0, critical: 1, info: 2 };
+    return severityOrder[a.severity] - severityOrder[b.severity];
+  });
+}
+
 export default function RiskToleranceEngine({ transactions }: RiskToleranceEngineProps) {
   const today = new Date();
+
+  const smartAlerts = useMemo(() => getSmartAlerts(transactions), [transactions]);
 
   const riskAlerts = useMemo(() => {
     const alerts: RiskAlert[] = [];
@@ -61,6 +118,9 @@ export default function RiskToleranceEngine({ transactions }: RiskToleranceEngin
 
   const criticalCount = riskAlerts.filter(a => a.severity === 'critical').length;
   const warningCount = riskAlerts.filter(a => a.severity === 'warning').length;
+  const overdueCount = smartAlerts.filter(a => a.type === 'overdue').length;
+  const dueTodayCount = smartAlerts.filter(a => a.type === 'due_today').length;
+  const upcomingCount = smartAlerts.filter(a => a.type === 'upcoming').length;
 
   const criticalServices = riskAlerts.filter(a => a.tolerance.criticality === 'critical');
   const nonCriticalServices = riskAlerts.filter(a => a.tolerance.criticality === 'non_critical');
@@ -79,6 +139,47 @@ export default function RiskToleranceEngine({ transactions }: RiskToleranceEngin
         </div>
       </div>
 
+      {smartAlerts.length > 0 && (
+        <div className="space-y-2">
+          {smartAlerts.map((alert, idx) => (
+            <motion.div
+              key={`smart-${alert.transaction.id}`}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.05 }}
+              className={cn(
+                'p-3 rounded-xl border flex items-center gap-3',
+                alert.severity === 'error' ? 'bg-red-500/10 border-red-500/30' :
+                alert.severity === 'critical' ? 'bg-orange-500/10 border-orange-500/30' :
+                'bg-blue-500/10 border-blue-500/30'
+              )}
+            >
+              {alert.type === 'overdue' ? (
+                <TimerOff className="w-5 h-5 text-red-400 flex-shrink-0" />
+              ) : alert.type === 'due_today' ? (
+                <AlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0" />
+              ) : (
+                <CalendarClock className="w-5 h-5 text-blue-400 flex-shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-white font-medium text-sm">{alert.transaction.description}</p>
+                <p className="text-xs text-slate-400">
+                  {alert.transaction.entity} • Vence: {formatDateInput(alert.transaction.due_date)}
+                </p>
+              </div>
+              <span className={cn(
+                'text-xs px-2 py-1 rounded-full font-medium flex-shrink-0',
+                alert.severity === 'error' ? 'bg-red-500/20 text-red-400' :
+                alert.severity === 'critical' ? 'bg-orange-500/20 text-orange-400' :
+                'bg-blue-500/20 text-blue-400'
+              )}>
+                {alert.label}
+              </span>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
       {criticalCount > 0 && (
         <motion.div 
           initial={{ opacity: 0, scale: 0.95 }}
@@ -96,11 +197,39 @@ export default function RiskToleranceEngine({ transactions }: RiskToleranceEngin
         </motion.div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className={`p-4 rounded-xl border ${overdueCount > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-800/50 border-slate-700/50'}`}>
+          <div className="flex items-center gap-2 mb-2">
+            <TimerOff className="w-4 h-4 text-red-400" />
+            <span className="text-slate-400 text-sm">Vencidos</span>
+          </div>
+          <p className={`text-2xl font-bold ${overdueCount > 0 ? 'text-red-400' : 'text-slate-400'}`}>
+            {overdueCount}
+          </p>
+        </div>
+
+        <div className={`p-4 rounded-xl border ${dueTodayCount > 0 ? 'bg-orange-500/10 border-orange-500/30' : 'bg-slate-800/50 border-slate-700/50'}`}>
+          <div className="flex items-center gap-2 mb-2">
+            <AlertCircle className="w-4 h-4 text-orange-400" />
+            <span className="text-slate-400 text-sm">Vence hoy</span>
+          </div>
+          <p className={`text-2xl font-bold ${dueTodayCount > 0 ? 'text-orange-400' : 'text-slate-400'}`}>
+            {dueTodayCount}
+          </p>
+        </div>
+
+        <div className="p-4 bg-blue-500/10 rounded-xl border border-blue-500/30">
+          <div className="flex items-center gap-2 mb-2">
+            <CalendarClock className="w-4 h-4 text-blue-400" />
+            <span className="text-slate-400 text-sm">Pronto</span>
+          </div>
+          <p className="text-2xl font-bold text-blue-400">{upcomingCount}</p>
+        </div>
+        
         <div className={`p-4 rounded-xl border ${criticalCount > 0 ? 'bg-red-500/10 border-red-500/30' : 'bg-slate-800/50 border-slate-700/50'}`}>
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-4 h-4 text-red-400" />
-            <span className="text-slate-400 text-sm">Criticos</span>
+            <span className="text-slate-400 text-sm">Críticos</span>
           </div>
           <p className={`text-2xl font-bold ${criticalCount > 0 ? 'text-red-400' : 'text-slate-400'}`}>
             {criticalCount}
@@ -113,16 +242,6 @@ export default function RiskToleranceEngine({ transactions }: RiskToleranceEngin
             <span className="text-slate-400 text-sm">Advertencia</span>
           </div>
           <p className="text-2xl font-bold text-amber-400">{warningCount}</p>
-        </div>
-        
-        <div className="p-4 bg-emerald-500/10 rounded-xl border border-emerald-500/30">
-          <div className="flex items-center gap-2 mb-2">
-            <Shield className="w-4 h-4 text-emerald-400" />
-            <span className="text-slate-400 text-sm">En Tiempo</span>
-          </div>
-          <p className="text-2xl font-bold text-emerald-400">
-            {transactions.filter(t => t.status === 'pending').length - criticalCount - warningCount}
-          </p>
         </div>
       </div>
 

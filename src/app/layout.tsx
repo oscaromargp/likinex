@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
+import ThemeInitializer from "@/components/ThemeInitializer";
 
 export const metadata: Metadata = {
   title: "LikinEX - El Orquestador de Liquidez",
@@ -14,8 +15,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
       <body className="min-h-full antialiased">
+        <ThemeInitializer />
         <AuthProvider>
           {children}
         </AuthProvider>

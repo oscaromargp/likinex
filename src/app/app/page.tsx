@@ -1,25 +1,29 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { LayoutDashboard, Calendar, FileText, Settings, Plus, Bell, LogOut, User } from 'lucide-react';
 import CalendarComponent from '@/components/Calendar';
 import Ledger from '@/components/Ledger';
 import SideDrawer from '@/components/SideDrawer';
+import PDFReport from '@/components/PDFReport';
 import MetricsCards from '@/components/MetricsCards';
 import SettingsComponent from '@/components/Settings';
 import CreditCardEngine from '@/components/CreditCardEngine';
 import RiskToleranceEngine from '@/components/RiskToleranceEngine';
 import CashFlowForecast from '@/components/CashFlowForecast';
-import { Transaction, CalendarEvent } from '@/types';
+import { Transaction, CalendarEvent, EntityConfig, DEFAULT_ENTITIES } from '@/types';
 import { mockCreditCards } from '@/lib/mockData';
 import { userTransactions, calculateMetrics, generateCalendarEvents } from '@/lib/userData';
+import { getSmartAlerts } from '@/components/RiskToleranceEngine';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/hooks/useTheme';
 
 function DashboardContent() {
   const { user, logout, isLoading: authLoading, isDemo } = useAuth();
+  const { resolvedTheme } = useTheme();
   const router = useRouter();
   const searchParams = useSearchParams();
   
@@ -28,6 +32,9 @@ function DashboardContent() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
+  const [entities, setEntities] = useState<EntityConfig[]>([]);
+  const [showPDFReport, setShowPDFReport] = useState(false);
+  const [printFilters, setPrintFilters] = useState({ dateRange: { start: null as string | null, end: null as string | null }, entity: 'all' as any });
 
   useEffect(() => {
     if (!authLoading && !user && !isDemo) {
@@ -50,6 +57,14 @@ function DashboardContent() {
       if (savedCategories) {
         setCategories(JSON.parse(savedCategories));
       }
+
+      const savedEntities = localStorage.getItem(`likinex_entities_${user?.id || 'demo'}`);
+      if (savedEntities) {
+        setEntities(JSON.parse(savedEntities));
+      } else {
+        setEntities(DEFAULT_ENTITIES);
+        localStorage.setItem(`likinex_entities_${user?.id || 'demo'}`, JSON.stringify(DEFAULT_ENTITIES));
+      }
     }
   }, [user, isDemo]);
 
@@ -69,6 +84,23 @@ function DashboardContent() {
 
   const metrics = calculateMetrics(transactions);
   const calendarEvents = generateCalendarEvents(transactions);
+  const smartAlerts = getSmartAlerts(transactions);
+  const alertCount = smartAlerts.length;
+
+  const attachmentCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    transactions.forEach(t => {
+      if (t.attachment_url) {
+        const saved = localStorage.getItem(`likinex_attachments_${t.id}`);
+        if (saved) {
+          counts[t.id] = JSON.parse(saved).length;
+        } else {
+          counts[t.id] = t.attachment_url.split(',').filter(Boolean).length;
+        }
+      }
+    });
+    return counts;
+  }, [transactions]);
 
   const handleTransactionClick = (transaction: Transaction) => {
     setSelectedTransaction(transaction);
@@ -133,6 +165,15 @@ function DashboardContent() {
     URL.revokeObjectURL(url);
   };
 
+  const handlePrint = (dateRange: { start: string | null; end: string | null }, entity: any) => {
+    setPrintFilters({ dateRange, entity });
+    setShowPDFReport(true);
+    setTimeout(() => {
+      window.print();
+      setShowPDFReport(false);
+    }, 300);
+  };
+
   const handleAddCategory = (category: string) => {
     const newCategories = [...categories, category];
     setCategories(newCategories);
@@ -149,6 +190,32 @@ function DashboardContent() {
     }
   };
 
+  const handleAddEntity = (entity: Omit<EntityConfig, 'id'>) => {
+    const id = entity.name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '') + '_' + Date.now();
+    const newEntity: EntityConfig = { ...entity, id };
+    const newEntities = [...entities, newEntity];
+    setEntities(newEntities);
+    if (user) {
+      localStorage.setItem(`likinex_entities_${user.id}`, JSON.stringify(newEntities));
+    }
+  };
+
+  const handleUpdateEntity = (entity: EntityConfig) => {
+    const newEntities = entities.map(e => e.id === entity.id ? entity : e);
+    setEntities(newEntities);
+    if (user) {
+      localStorage.setItem(`likinex_entities_${user.id}`, JSON.stringify(newEntities));
+    }
+  };
+
+  const handleDeleteEntity = (id: string) => {
+    const newEntities = entities.filter(e => e.id !== id);
+    setEntities(newEntities);
+    if (user) {
+      localStorage.setItem(`likinex_entities_${user.id}`, JSON.stringify(newEntities));
+    }
+  };
+
   const handleLogout = () => {
     logout();
     if (isDemo) {
@@ -160,7 +227,7 @@ function DashboardContent() {
 
   if (authLoading || (!user && !isDemo)) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
       </div>
     );
@@ -174,10 +241,10 @@ function DashboardContent() {
   ] as const;
 
   return (
-    <div className="min-h-screen bg-slate-950">
+    <div className="min-h-screen bg-[var(--bg-primary)]">
       <div className="flex">
-        <aside className="w-64 h-screen bg-slate-900/80 backdrop-blur-xl border-r border-slate-800/50 fixed left-0 top-0 flex flex-col">
-          <div className="p-6 border-b border-slate-800/50">
+        <aside className="w-64 h-screen bg-[var(--bg-secondary)]/80 backdrop-blur-xl border-r border-[var(--border-subtle)] fixed left-0 top-0 flex flex-col">
+          <div className="p-6 border-b border-[var(--border-subtle)]">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
                 <span className="text-lg">💰</span>
@@ -189,15 +256,15 @@ function DashboardContent() {
             </div>
           </div>
 
-          <div className="px-4 py-3 border-b border-slate-800/50">
-            <div className="flex items-center gap-3 p-2 bg-slate-800/30 rounded-lg">
+          <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
+            <div className="flex items-center gap-3 p-2 bg-[var(--bg-tertiary)]/30 rounded-lg">
               <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDemo ? 'bg-blue-500/20' : 'bg-emerald-500/20'}`}>
                 <User className={`w-4 h-4 ${isDemo ? 'text-blue-400' : 'text-emerald-400'}`} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-white text-sm font-medium truncate">{user?.name || user?.email}</p>
+                <p className="text-[var(--text-primary)] text-sm font-medium truncate">{user?.name || user?.email}</p>
                 <div className="flex items-center gap-2">
-                  <p className="text-slate-500 text-xs truncate">{user?.email}</p>
+                  <p className="text-[var(--text-muted)] text-xs truncate">{user?.email}</p>
                   {isDemo && (
                     <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full">DEMO</span>
                   )}
@@ -216,7 +283,7 @@ function DashboardContent() {
                     'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all',
                     activeView === item.id
                       ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      : 'text-slate-400 hover:bg-slate-800/50 hover:text-white'
+                      : 'text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
                   )}
                 >
                   <item.icon className="w-5 h-5" />
@@ -226,10 +293,10 @@ function DashboardContent() {
             </div>
           </nav>
 
-          <div className="p-4 border-t border-slate-800/50">
+          <div className="p-4 border-t border-[var(--border-subtle)]">
             <button 
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[var(--text-muted)] hover:bg-red-500/10 hover:text-red-400 transition-all"
             >
               <LogOut className="w-5 h-5" />
               <span className="font-medium">Cerrar Sesión</span>
@@ -238,14 +305,18 @@ function DashboardContent() {
         </aside>
 
         <main className="flex-1 ml-64">
-          <header className="h-16 bg-slate-900/50 backdrop-blur-xl border-b border-slate-800/50 px-8 flex items-center justify-between sticky top-0 z-30">
+          <header className="h-16 bg-[var(--bg-secondary)]/50 backdrop-blur-xl border-b border-[var(--border-subtle)] px-8 flex items-center justify-between sticky top-0 z-30">
             <div className="flex items-center gap-4">
-              <h2 className="text-lg font-semibold text-white capitalize">{activeView}</h2>
+              <h2 className="text-lg font-semibold text-[var(--text-primary)] capitalize">{activeView}</h2>
             </div>
             <div className="flex items-center gap-4">
-              <button className="p-2 rounded-xl bg-slate-800/50 hover:bg-slate-700/50 transition-colors relative">
-                <Bell className="w-5 h-5 text-slate-400" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+              <button className="p-2 rounded-xl bg-[var(--bg-tertiary)]/50 hover:bg-[var(--bg-tertiary)] transition-colors relative">
+                <Bell className="w-5 h-5 text-[var(--text-muted)]" />
+                {alertCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
+                    {alertCount}
+                  </span>
+                )}
               </button>
               {activeView !== 'settings' && (
                 <button className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors">
@@ -346,7 +417,7 @@ function DashboardContent() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <Ledger transactions={transactions} onRowClick={handleTransactionClick} />
+                <Ledger transactions={transactions} onRowClick={handleTransactionClick} onPrint={handlePrint} attachmentCounts={attachmentCounts} />
               </motion.div>
             )}
 
@@ -362,6 +433,10 @@ function DashboardContent() {
                   categories={categories}
                   onAddCategory={handleAddCategory}
                   onDeleteCategory={handleDeleteCategory}
+                  entities={entities}
+                  onAddEntity={handleAddEntity}
+                  onUpdateEntity={handleUpdateEntity}
+                  onDeleteEntity={handleDeleteEntity}
                 />
               </motion.div>
             )}
@@ -374,6 +449,14 @@ function DashboardContent() {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         onUpdate={handleUpdateTransaction}
+        allTransactions={transactions}
+      />
+
+      <PDFReport
+        transactions={transactions}
+        dateRange={printFilters.dateRange}
+        entityFilter={printFilters.entity}
+        isVisible={showPDFReport}
       />
     </div>
   );
@@ -382,7 +465,7 @@ function DashboardContent() {
 export default function Dashboard() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
       </div>
     }>

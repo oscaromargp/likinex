@@ -1,4 +1,47 @@
-export type Entity = 'oscaromargp' | 'centenario' | 'tulum' | 'paypaps' | 'bnrecords' | 'pardesantos' | 'zxyw';
+export type Entity = 'oscaromargp' | 'centenario' | 'tulum' | 'paypaps' | 'bnrecords' | 'pardesantos' | 'zxyw' | string;
+
+export interface EntityConfig {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  is_active: boolean;
+}
+
+export const DEFAULT_ENTITIES: EntityConfig[] = [
+  { id: 'oscaromargp', name: 'Oscaromargp', icon: '💼', color: 'emerald', is_active: true },
+  { id: 'centenario', name: 'Centenario', icon: '🏢', color: 'indigo', is_active: true },
+  { id: 'tulum', name: 'Tulum', icon: '🏖️', color: 'pink', is_active: true },
+  { id: 'paypaps', name: 'Paypaps', icon: '💻', color: 'blue', is_active: true },
+  { id: 'bnrecords', name: 'BN Records', icon: '🎵', color: 'amber', is_active: true },
+  { id: 'pardesantos', name: 'Pardesantos', icon: '🚗', color: 'cyan', is_active: true },
+  { id: 'zxyw', name: 'XYZW', icon: '🏭', color: 'violet', is_active: true },
+];
+
+export const ENTITY_COLORS_MAP: Record<string, string> = {
+  emerald: 'bg-emerald-500/20 text-emerald-400',
+  indigo: 'bg-indigo-500/20 text-indigo-400',
+  pink: 'bg-pink-500/20 text-pink-400',
+  blue: 'bg-blue-500/20 text-blue-400',
+  amber: 'bg-amber-500/20 text-amber-400',
+  cyan: 'bg-cyan-500/20 text-cyan-400',
+  violet: 'bg-violet-500/20 text-violet-400',
+  red: 'bg-red-500/20 text-red-400',
+  green: 'bg-green-500/20 text-green-400',
+  yellow: 'bg-yellow-500/20 text-yellow-400',
+  purple: 'bg-purple-500/20 text-purple-400',
+  orange: 'bg-orange-500/20 text-orange-400',
+  teal: 'bg-teal-500/20 text-teal-400',
+  rose: 'bg-rose-500/20 text-rose-400',
+  fuchsia: 'bg-fuchsia-500/20 text-fuchsia-400',
+};
+
+export const AVAILABLE_COLORS = [
+  'emerald', 'indigo', 'pink', 'blue', 'amber', 'cyan', 'violet',
+  'red', 'green', 'yellow', 'purple', 'orange', 'teal', 'rose', 'fuchsia',
+];
+
+export const COMMON_EMOJIS = ['💼', '🏢', '🏖️', '💻', '🎵', '🚗', '🏭', '🏠', '🏦', '💳', '📊', '🎯', '🔧', '📱', '🌐', '💡', '🚀', '⭐', '🔔', '📦'];
 
 export type RecurrenceType = 'weekly' | 'monthly' | 'bimonthly' | 'quarterly' | 'triennial' | 'yearly' | 'none';
 
@@ -135,6 +178,7 @@ export interface CalendarEvent {
   entity: Entity;
   status: TransactionStatus;
   isInstance: boolean;
+  isProjection?: boolean;
 }
 
 export interface FilterState {
@@ -147,7 +191,54 @@ export interface FilterState {
   };
 }
 
-export const ENTITY_LABELS: Record<Entity, string> = {
+export function getEntityLabel(entity: Entity, entities?: EntityConfig[]): string {
+  const config = entities?.find(e => e.id === entity);
+  if (config) return config.name;
+  const defaults: Record<string, string> = {
+    oscaromargp: 'Oscaromargp',
+    centenario: 'Centenario',
+    tulum: 'Tulum',
+    paypaps: 'Paypaps',
+    bnrecords: 'BN Records',
+    pardesantos: 'Pardesantos',
+    zxyw: 'XYZW'
+  };
+  return defaults[entity] || entity;
+}
+
+export function getEntityColor(entity: Entity, entities?: EntityConfig[]): string {
+  const config = entities?.find(e => e.id === entity);
+  if (config && ENTITY_COLORS_MAP[config.color]) {
+    return ENTITY_COLORS_MAP[config.color];
+  }
+  const defaults: Record<string, string> = {
+    oscaromargp: 'bg-emerald-500/20 text-emerald-400',
+    centenario: 'bg-indigo-500/20 text-indigo-400',
+    tulum: 'bg-pink-500/20 text-pink-400',
+    paypaps: 'bg-blue-500/20 text-blue-400',
+    bnrecords: 'bg-amber-500/20 text-amber-400',
+    pardesantos: 'bg-cyan-500/20 text-cyan-400',
+    zxyw: 'bg-violet-500/20 text-violet-400'
+  };
+  return defaults[entity] || 'bg-slate-500/20 text-slate-400';
+}
+
+export function getEntityIcon(entity: Entity, entities?: EntityConfig[]): string {
+  const config = entities?.find(e => e.id === entity);
+  if (config) return config.icon;
+  const defaults: Record<string, string> = {
+    oscaromargp: '💼',
+    centenario: '🏢',
+    tulum: '🏖️',
+    paypaps: '💻',
+    bnrecords: '🎵',
+    pardesantos: '🚗',
+    zxyw: '🏭'
+  };
+  return defaults[entity] || '📁';
+}
+
+export const ENTITY_LABELS: Record<string, string> = {
   oscaromargp: 'Oscaromargp',
   centenario: 'Centenario',
   tulum: 'Tulum',
@@ -157,7 +248,7 @@ export const ENTITY_LABELS: Record<Entity, string> = {
   zxyw: 'XYZW'
 };
 
-export const ENTITY_COLORS: Record<Entity, string> = {
+export const ENTITY_COLORS: Record<string, string> = {
   oscaromargp: 'bg-emerald-500/20 text-emerald-400',
   centenario: 'bg-indigo-500/20 text-indigo-400',
   tulum: 'bg-pink-500/20 text-pink-400',
@@ -264,9 +355,87 @@ export interface NotificationConfig {
   notify_critical_only: boolean;
 }
 
+export type SmartAlertType = 'upcoming' | 'due_today' | 'overdue';
+
+export interface SmartAlert {
+  transaction: Transaction;
+  type: SmartAlertType;
+  label: string;
+  severity: 'info' | 'critical' | 'error';
+}
+
 export interface User {
   id: string;
   email: string;
   name?: string;
   created_at: string;
+}
+
+export type PunctualityLevel = 'on-time' | 'slightly-late' | 'very-late' | 'unpaid';
+
+export interface PunctualityScore {
+  score: number;
+  level: PunctualityLevel;
+  label: string;
+  daysLate: number;
+  consecutiveOnTime: number;
+}
+
+export function calculatePunctuality(dueDate: string, paidDate?: string): PunctualityScore | null {
+  if (!paidDate) return null;
+
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  const paid = new Date(paidDate);
+  paid.setHours(0, 0, 0, 0);
+
+  const diffMs = paid.getTime() - due.getTime();
+  const daysLate = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+  let score: number;
+  let level: PunctualityLevel;
+  let label: string;
+
+  if (daysLate <= 0) {
+    score = 100;
+    level = 'on-time';
+    label = 'Puntual';
+  } else if (daysLate <= 2) {
+    score = 70;
+    level = 'slightly-late';
+    label = '1-2 días';
+  } else {
+    score = 40;
+    level = 'very-late';
+    label = '3+ días';
+  }
+
+  return { score, level, label, daysLate, consecutiveOnTime: 0 };
+}
+
+export function calculateConsecutiveOnTime(transactions: Transaction[], templateId: string): number {
+  const templateTx = transactions
+    .filter(t => t.template_id === templateId && t.status === 'settled' && t.paid_date)
+    .sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime());
+
+  let count = 0;
+  for (const tx of templateTx) {
+    const due = new Date(tx.due_date);
+    due.setHours(0, 0, 0, 0);
+    const paid = new Date(tx.paid_date!);
+    paid.setHours(0, 0, 0, 0);
+    if (paid <= due) {
+      count++;
+    } else {
+      break;
+    }
+  }
+  return count;
+}
+
+export function getScoreLabel(score: number): string {
+  if (score >= 90) return 'Excelente';
+  if (score >= 70) return 'Bueno';
+  if (score >= 50) return 'Regular';
+  return 'Deficiente';
 }

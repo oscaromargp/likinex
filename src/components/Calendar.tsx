@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Grid3X3 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Grid3X3, Eye } from 'lucide-react';
 import { CalendarEvent, ENTITY_COLORS, STATUS_COLORS, ENTITY_LABELS } from '@/types';
 import { formatDateInput, isToday, isUrgent, formatCurrency } from '@/lib/utils';
 
@@ -52,6 +52,12 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick }: Ca
     return eventDate.getFullYear() === year && eventDate.getMonth() === month;
   }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
+  const projectionCount = events.filter(e => e.isProjection).length;
+  const isFutureMonth = (() => {
+    const now = new Date();
+    return year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth());
+  })();
+
   return (
     <div className="bg-slate-900/50 backdrop-blur-xl border border-emerald-500/20 rounded-2xl p-6">
       <div className="flex items-center justify-between mb-6">
@@ -59,7 +65,15 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick }: Ca
           <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
             <CalendarIcon className="w-5 h-5 text-emerald-400" />
           </div>
-          <h2 className="text-xl font-bold text-white">Calendario</h2>
+          <div>
+            <h2 className="text-xl font-bold text-white">Calendario</h2>
+            {isFutureMonth && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 inline-flex items-center gap-1">
+                <Eye className="w-3 h-3" />
+                Proyección
+              </span>
+            )}
+          </div>
         </div>
         
         <div className="flex items-center gap-2">
@@ -119,6 +133,7 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick }: Ca
               const today = isToday(dateStr);
               const urgent = dayEvents.some(e => isUrgent(e.date));
               const isSelected = selectedDate === dateStr;
+              const hasProjections = dayEvents.some(e => e.isProjection);
 
               return (
                 <button
@@ -132,6 +147,7 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick }: Ca
                   className={`
                     h-20 p-1 rounded-lg transition-all relative flex flex-col items-start
                     ${isSelected ? 'bg-emerald-500/20 border border-emerald-500/40' : 'bg-slate-800/30 hover:bg-slate-700/50 border border-transparent'}
+                    ${hasProjections ? 'ring-1 ring-indigo-500/30' : ''}
                   `}
                 >
                   <span className={`
@@ -145,6 +161,7 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick }: Ca
                       <div
                         key={i}
                         className={`w-2 h-2 rounded-full ${
+                          e.isProjection ? 'bg-indigo-400' :
                           e.status === 'settled' ? 'bg-emerald-400' :
                           urgent ? 'bg-red-400' : 'bg-amber-400'
                         }`}
@@ -182,9 +199,16 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick }: Ca
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-white font-medium text-sm">{event.title}</span>
-                          <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[event.status]}`}>
-                            {event.status === 'settled' ? 'Liquidado' : 'Pendiente'}
-                          </span>
+                          <div className="flex items-center gap-1">
+                            {event.isProjection && (
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400">
+                                Proyección
+                              </span>
+                            )}
+                            <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[event.status]}`}>
+                              {event.status === 'settled' ? 'Liquidado' : 'Pendiente'}
+                            </span>
+                          </div>
                         </div>
                         <div className="flex items-center gap-3 mt-1">
                           <span className={`text-xs px-2 py-0.5 rounded-full ${ENTITY_COLORS[event.entity]}`}>
@@ -222,7 +246,7 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick }: Ca
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: idx * 0.02 }}
                   onClick={() => onEventClick?.(event)}
-                  className="border-b border-slate-800/30 hover:bg-slate-800/30 cursor-pointer transition-colors"
+                  className={`border-b border-slate-800/30 hover:bg-slate-800/30 cursor-pointer transition-colors ${event.isProjection ? 'opacity-70' : ''}`}
                 >
                   <td className="py-3 px-4">
                     <span className={`text-sm ${isToday(event.date) ? 'text-emerald-400 font-medium' : 'text-slate-400'}`}>
@@ -241,9 +265,16 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick }: Ca
                     <span className="text-emerald-400 font-semibold">{formatCurrency(event.amount)}</span>
                   </td>
                   <td className="py-3 px-4">
-                    <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[event.status]}`}>
-                      {event.status === 'settled' ? 'Liquidado' : 'Pendiente'}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      {event.isProjection && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400">
+                          Proyección
+                        </span>
+                      )}
+                      <span className={`text-xs px-2 py-1 rounded-full ${STATUS_COLORS[event.status]}`}>
+                        {event.status === 'settled' ? 'Liquidado' : 'Pendiente'}
+                      </span>
+                    </div>
                   </td>
                 </motion.tr>
               ))}

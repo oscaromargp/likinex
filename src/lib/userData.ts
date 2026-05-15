@@ -386,7 +386,86 @@ export const generateCalendarEvents = (transactions: Transaction[]): CalendarEve
       status: t.status,
       isInstance: true
     });
+
+    if (t.recurrence !== 'none' && t.status === 'pending') {
+      const projections = generateProjections(t, 3);
+      projections.forEach((proj, idx) => {
+        events.push({
+          id: `${t.id}-proj-${idx}`,
+          title: t.description,
+          date: proj.date,
+          amount: t.amount,
+          entity: t.entity,
+          status: 'pending' as const,
+          isInstance: false,
+          isProjection: true
+        });
+      });
+    }
   });
 
   return events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 };
+
+function generateProjections(transaction: Transaction, monthsAhead: number): { date: string }[] {
+  const projections: { date: string }[] = [];
+  const baseDate = new Date(transaction.due_date);
+  const now = new Date();
+  const limitDate = new Date(now.getFullYear(), now.getMonth() + monthsAhead, 0);
+
+  if (baseDate >= limitDate) return projections;
+
+  let currentDate = new Date(baseDate);
+
+  switch (transaction.recurrence) {
+    case 'weekly': {
+      currentDate.setDate(currentDate.getDate() + 7);
+      while (currentDate <= limitDate) {
+        projections.push({ date: formatDate(currentDate) });
+        currentDate.setDate(currentDate.getDate() + 7);
+      }
+      break;
+    }
+    case 'monthly': {
+      currentDate.setMonth(currentDate.getMonth() + 1);
+      while (currentDate <= limitDate) {
+        projections.push({ date: formatDate(currentDate) });
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+      break;
+    }
+    case 'bimonthly': {
+      currentDate.setMonth(currentDate.getMonth() + 2);
+      while (currentDate <= limitDate) {
+        projections.push({ date: formatDate(currentDate) });
+        currentDate.setMonth(currentDate.getMonth() + 2);
+      }
+      break;
+    }
+    case 'quarterly': {
+      currentDate.setMonth(currentDate.getMonth() + 3);
+      while (currentDate <= limitDate) {
+        projections.push({ date: formatDate(currentDate) });
+        currentDate.setMonth(currentDate.getMonth() + 3);
+      }
+      break;
+    }
+    case 'triennial': {
+      currentDate.setFullYear(currentDate.getFullYear() + 3);
+      if (currentDate <= limitDate) {
+        projections.push({ date: formatDate(currentDate) });
+      }
+      break;
+    }
+    case 'yearly': {
+      currentDate.setFullYear(currentDate.getFullYear() + 1);
+      while (currentDate <= limitDate) {
+        projections.push({ date: formatDate(currentDate) });
+        currentDate.setFullYear(currentDate.getFullYear() + 1);
+      }
+      break;
+    }
+  }
+
+  return projections;
+}
