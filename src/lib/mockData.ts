@@ -1,4 +1,4 @@
-import { Transaction, TransactionTemplate, LiquidityMetrics, CalendarEvent, Entity } from '@/types';
+import { Transaction, TransactionTemplate, LiquidityMetrics, CalendarEvent, Entity, CreditCard } from '@/types';
 
 const today = new Date();
 
@@ -233,7 +233,7 @@ export const calculateMetrics = (transactions: Transaction[]): LiquidityMetrics 
   const committed = transactions.reduce((sum, t) => sum + t.amount, 0);
   const settled = transactions.filter(t => t.status === 'settled').reduce((sum, t) => sum + t.amount, 0);
   const pending = transactions.filter(t => t.status === 'pending').reduce((sum, t) => sum + t.amount, 0);
-  const available = settled;
+  const available = DEFAULT_AVAILABLE_BALANCE;
 
   return { committed, settled, pending, available };
 };
@@ -307,3 +307,47 @@ function getNextRecurrenceDate(recurrence: string, day?: number): Date | null {
       return null;
   }
 }
+
+export const mockCreditCards: CreditCard[] = [
+  {
+    id: 'card-1',
+    entity: 'Banorte',
+    name: 'Tarjeta Banorte Oro',
+    last4: '4521',
+    statement_date: 15,
+    due_date: 5,
+    current_balance: 12500,
+    minimum_payment: 1500,
+    has_msi: true,
+    msi_total: 4500,
+    interest_rate: 39.9
+  },
+  {
+    id: 'card-2',
+    entity: 'Santander',
+    name: 'Santander Light',
+    last4: '8877',
+    statement_date: 20,
+    due_date: 10,
+    current_balance: 8300,
+    minimum_payment: 900,
+    has_msi: false,
+    msi_total: 0,
+    interest_rate: 44.9
+  },
+  {
+    id: 'card-3',
+    entity: 'BBVA',
+    name: 'BBVA Bonos',
+    last4: '3355',
+    statement_date: 25,
+    due_date: 15,
+    current_balance: 15800,
+    minimum_payment: 2000,
+    has_msi: true,
+    msi_total: 6200,
+    interest_rate: 36.5
+  }
+];
+
+export const DEFAULT_AVAILABLE_BALANCE = 85000;

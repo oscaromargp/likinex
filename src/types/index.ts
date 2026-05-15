@@ -1,14 +1,68 @@
 export type Entity = 'oscaromargp' | 'centenario' | 'tulum' | 'paypaps' | 'bnrecords' | 'pardesantos' | 'zxyw';
 
-export type RecurrenceType = 'weekly' | 'monthly' | 'bimonthly' | 'quarterly' | 'triennial' | 'none';
+export type RecurrenceType = 'weekly' | 'monthly' | 'bimonthly' | 'quarterly' | 'triennial' | 'yearly' | 'none';
 
 export type TransactionStatus = 'pending' | 'settled' | 'cancelled';
 
 export type PaymentMethod = 'transfer' | 'cash' | 'card' | 'check' | 'other';
 
+export type Currency = 'MXN' | 'USD' | 'BTC' | 'ETH' | 'USDT';
+
+export const CURRENCY_SYMBOLS: Record<Currency, string> = {
+  MXN: '$',
+  USD: '$',
+  BTC: '₿',
+  ETH: 'Ξ',
+  USDT: '₮'
+};
+
+export const CURRENCY_NAMES: Record<Currency, string> = {
+  MXN: 'Peso Mexicano',
+  USD: 'Dólar estadounidense',
+  BTC: 'Bitcoin',
+  ETH: 'Ethereum',
+  USDT: 'Tether'
+};
+
+export const EXCHANGE_RATES: Record<Currency, number> = {
+  MXN: 1,
+  USD: 17.15,
+  BTC: 0.000027,
+  ETH: 0.00041,
+  USDT: 17.15
+};
+
+export function convertCurrency(amount: number, from: Currency, to: Currency): number {
+  const amountInMXN = from === 'MXN' ? amount : amount / EXCHANGE_RATES[from];
+  return to === 'MXN' ? amountInMXN : amountInMXN * EXCHANGE_RATES[to];
+}
+
+export function formatCurrencyWithSymbol(amount: number, currency: Currency): string {
+  const symbol = CURRENCY_SYMBOLS[currency];
+  if (currency === 'BTC' || currency === 'ETH') {
+    return `${symbol}${amount.toFixed(8)}`;
+  }
+  return `${symbol}${amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+export type Category = 
+  | 'servicios' 
+  | 'renta' 
+  | 'servicio' 
+  | 'suscription' 
+  | 'telefonia' 
+  | 'servicios_basicos' 
+  | 'dominio' 
+  | 'vps' 
+  | 'limpieza' 
+  | 'pension' 
+  | 'tarjeta' 
+  | 'otro';
+
 export interface Transaction {
   id: string;
   template_id?: string;
+  user_id?: string;
   entity: Entity;
   description: string;
   amount: number;
@@ -18,6 +72,7 @@ export interface Transaction {
   recurrence: RecurrenceType;
   recurrence_day?: number;
   payment_method?: PaymentMethod;
+  category?: Category;
   notes?: string;
   follow_up?: string;
   attachment_url?: string;
@@ -130,5 +185,88 @@ export const RECURRENCE_LABELS: Record<RecurrenceType, string> = {
   bimonthly: 'Bimestral',
   quarterly: 'Trimestral',
   triennial: 'Trienal',
+  yearly: 'Anual',
   none: 'Sin recurrencia'
 };
+
+export const CATEGORY_LABELS: Record<Category, string> = {
+  servicios: 'Servicios',
+  renta: 'Renta',
+  servicio: 'Servicio',
+  suscription: 'Suscripción',
+  telefonia: 'Telefonía',
+  servicios_basicos: 'Servicios Básicos',
+  dominio: 'Dominio',
+  vps: 'VPS/Servidor',
+  limpieza: 'Limpieza',
+  pension: 'Pensión',
+  tarjeta: 'Tarjeta de Crédito',
+  otro: 'Otro'
+};
+
+export type ServiceCriticality = 'critical' | 'non_critical';
+
+export interface ServiceTolerance {
+  service_type: string;
+  tolerance_days: number;
+  criticality: ServiceCriticality;
+}
+
+export const DEFAULT_TOLERANCES: ServiceTolerance[] = [
+  { service_type: ' CFE', tolerance_days: 2, criticality: 'critical' },
+  { service_type: 'telefonia', tolerance_days: 3, criticality: 'critical' },
+  { service_type: 'servicios_basicos', tolerance_days: 2, criticality: 'critical' },
+  { service_type: 'renta', tolerance_days: 5, criticality: 'critical' },
+  { service_type: 'suscription', tolerance_days: 7, criticality: 'non_critical' },
+  { service_type: 'dominio', tolerance_days: 7, criticality: 'non_critical' },
+  { service_type: 'vps', tolerance_days: 3, criticality: 'critical' },
+  { service_type: 'tarjeta', tolerance_days: 3, criticality: 'non_critical' },
+  { service_type: 'pension', tolerance_days: 1, criticality: 'critical' },
+  { service_type: 'limpieza', tolerance_days: 2, criticality: 'non_critical' },
+  { service_type: 'servicio', tolerance_days: 5, criticality: 'non_critical' },
+  { service_type: 'otro', tolerance_days: 7, criticality: 'non_critical' }
+];
+
+export interface CreditCard {
+  id: string;
+  entity: string;
+  name: string;
+  last4: string;
+  statement_date: number;
+  due_date: number;
+  current_balance: number;
+  minimum_payment: number;
+  has_msi: boolean;
+  msi_total: number;
+  interest_rate: number;
+}
+
+export interface CardAlert {
+  card_id: string;
+  type: 'statement_soon' | 'due_soon' | 'opportunity_cost' | 'msi_warning' | 'balance_high';
+  message: string;
+  severity: 'info' | 'warning' | 'critical';
+  days_until: number;
+}
+
+export interface CashFlowForecast {
+  current_balance: number;
+  daily_burn_rate: number;
+  runway_days: number;
+  forecast_by_date: { date: string; balance: number }[];
+}
+
+export interface NotificationConfig {
+  whatsapp_enabled: boolean;
+  phone_number: string;
+  n8n_webhook: string;
+  notify_days_before: number[];
+  notify_critical_only: boolean;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  created_at: string;
+}

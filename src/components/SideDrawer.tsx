@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, DollarSign, FileText, Clock, CreditCard, Paperclip, Save } from 'lucide-react';
-import { Transaction, TransactionStatus, PaymentMethod, ENTITY_LABELS, STATUS_LABELS } from '@/types';
+import { Transaction, TransactionStatus, PaymentMethod, ENTITY_LABELS, STATUS_LABELS, Currency, CURRENCY_SYMBOLS, convertCurrency } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+
+const CURRENCIES: Currency[] = ['MXN', 'USD', 'BTC', 'ETH', 'USDT'];
 
 interface SideDrawerProps {
   transaction: Transaction | null;
@@ -20,8 +22,15 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate }: S
     notes: '',
     payment_method: '',
     follow_up: '',
-    price_change: 0
+    price_change: 0,
+    currency: 'MXN' as Currency,
+    displayCurrency: 'MXN' as Currency
   });
+
+  const convertAndDisplay = (amount: number, from: Currency, to: Currency) => {
+    if (from === to) return amount;
+    return convertCurrency(amount, from, to);
+  };
 
   if (!transaction) return null;
 
@@ -116,10 +125,24 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate }: S
                   </div>
 
                   <div className="p-4 bg-slate-800/50 rounded-xl">
-                    <p className="text-xs text-slate-400 mb-1">Monto</p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-slate-400">Monto</p>
+                      <select
+                        value={formData.displayCurrency}
+                        onChange={e => setFormData(f => ({ ...f, displayCurrency: e.target.value as Currency }))}
+                        className="bg-slate-700/50 text-xs text-white px-2 py-1 rounded-lg border border-slate-600"
+                      >
+                        {CURRENCIES.map(c => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
                     <p className="text-2xl font-bold text-emerald-400">
-                      {formatCurrency(transaction.amount)}
+                      {CURRENCY_SYMBOLS[formData.displayCurrency]}{convertAndDisplay(transaction.amount, 'MXN', formData.displayCurrency).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
+                    {formData.displayCurrency !== 'MXN' && (
+                      <p className="text-xs text-slate-500 mt-1">≈ {formatCurrency(transaction.amount)} MXN</p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
