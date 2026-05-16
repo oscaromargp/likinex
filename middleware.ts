@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 
 const protectedPaths = ['/app'];
-const publicApiPaths = ['/api/notifications', '/api/migrate'];
+const publicApiPaths = ['/api/notifications', '/api/migrate', '/api/seed'];
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
