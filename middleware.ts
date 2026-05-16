@@ -1,40 +1,52 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 
 const protectedPaths = ['/app'];
-const apiProtectedPaths = ['/api'];
 const publicApiPaths = ['/api/notifications', '/api/migrate'];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const sessionCookie = request.cookies.get('sb-tmcqyscstxlilfbsdcwn-auth-token');
 
   const isProtectedPage = protectedPaths.some(
     path => pathname === path || pathname.startsWith(`${path}/`)
   );
 
-  const isProtectedApi = apiProtectedPaths.some(
-    path => pathname === path || pathname.startsWith(`${path}/`)
+  const isProtectedApi = pathname.startsWith('/api/') && !publicApiPaths.some(p => pathname.startsWith(p));
+
+  let response = NextResponse.next({ request });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return request.cookies.getAll();
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value);
+            response.cookies.set(name, value, options);
+          });
+        },
+      },
+    }
   );
 
-  const isPublicApi = publicApiPaths.some(
-    path => pathname === path || pathname.startsWith(`${path}/`)
-  );
+  const { data: { session } } = await supabase.auth.getSession();
 
-  if (isProtectedApi && !isPublicApi && !sessionCookie) {
-    return NextResponse.json(
-      { error: 'Unauthorized' },
-      { status: 401 }
-    );
+  if (isProtectedApi && !session) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  if (isProtectedPage && !sessionCookie) {
+  if (isProtectedPage && !session) {
     const authUrl = new URL('/auth', request.url);
     authUrl.searchParams.set('from', pathname);
     return NextResponse.redirect(authUrl);
   }
 
-  return NextResponse.next();
+  return response;
 }
 
 export const config = {
