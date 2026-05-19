@@ -82,6 +82,11 @@ function DashboardContent() {
   const [showPDFReport, setShowPDFReport] = useState(false);
   const [printFilters, setPrintFilters] = useState({ dateRange: { start: null as string | null, end: null as string | null }, entity: 'all' as any });
 
+  // Estados locales para el modo Demo interactivo
+  const [demoTransactions, setDemoTransactions] = useState<Transaction[]>([]);
+  const [demoEntities, setDemoEntities] = useState<EntityConfig[]>([]);
+  const [demoCategories, setDemoCategories] = useState<string[]>([]);
+
   const { data: dbTransactions = [], isLoading: loadingTransactions } = useTransactions(user?.id);
   const createTransaction = useCreateTransaction();
   const updateTransaction = useUpdateTransaction();
@@ -96,6 +101,62 @@ function DashboardContent() {
   const createCategory = useCreateCategory();
   const deleteCategory = useDeleteCategory();
 
+  // Inicializar estados de Demo desde localStorage o mockData
+  useEffect(() => {
+    if (isDemo) {
+      const savedTx = localStorage.getItem('likinex_demo_transactions');
+      if (savedTx) {
+        try {
+          setDemoTransactions(JSON.parse(savedTx));
+        } catch (e) {
+          const { userTransactions } = require('@/lib/userData');
+          setDemoTransactions(userTransactions);
+        }
+      } else {
+        const { userTransactions } = require('@/lib/userData');
+        setDemoTransactions(userTransactions);
+      }
+
+      const savedEnt = localStorage.getItem('likinex_demo_entities');
+      if (savedEnt) {
+        try {
+          setDemoEntities(JSON.parse(savedEnt));
+        } catch (e) {
+          setDemoEntities(DEFAULT_ENTITIES);
+        }
+      } else {
+        setDemoEntities(DEFAULT_ENTITIES);
+      }
+
+      const savedCat = localStorage.getItem('likinex_demo_categories');
+      if (savedCat) {
+        try {
+          setDemoCategories(JSON.parse(savedCat));
+        } catch (e) {
+          setDemoCategories([]);
+        }
+      } else {
+        setDemoCategories([]);
+      }
+    }
+  }, [isDemo]);
+
+  // Auxiliares para actualizar estados demo y guardarlos en localStorage
+  const updateDemoTransactions = (newTx: Transaction[]) => {
+    setDemoTransactions(newTx);
+    localStorage.setItem('likinex_demo_transactions', JSON.stringify(newTx));
+  };
+
+  const updateDemoEntities = (newEnt: EntityConfig[]) => {
+    setDemoEntities(newEnt);
+    localStorage.setItem('likinex_demo_entities', JSON.stringify(newEnt));
+  };
+
+  const updateDemoCategories = (newCat: string[]) => {
+    setDemoCategories(newCat);
+    localStorage.setItem('likinex_demo_categories', JSON.stringify(newCat));
+  };
+
   useEffect(() => {
     if (!authLoading && !user && !isDemo) {
       router.push(`/auth?from=/app`);
@@ -104,14 +165,13 @@ function DashboardContent() {
 
   const transactions: Transaction[] = useMemo(() => {
     if (isDemo) {
-      const { userTransactions } = require('@/lib/userData');
-      return userTransactions;
+      return demoTransactions;
     }
     return dbTransactions.map(mapDBToTransaction);
-  }, [dbTransactions, isDemo]);
+  }, [dbTransactions, isDemo, demoTransactions]);
 
   const entities: EntityConfig[] = useMemo(() => {
-    if (isDemo) return DEFAULT_ENTITIES;
+    if (isDemo) return demoEntities;
     return dbEntities.map(e => ({
       id: e.id,
       name: e.name,
@@ -119,12 +179,12 @@ function DashboardContent() {
       color: e.color,
       is_active: e.is_active,
     }));
-  }, [dbEntities, isDemo]);
+  }, [dbEntities, isDemo, demoEntities]);
 
   const categories: string[] = useMemo(() => {
-    if (isDemo) return [];
+    if (isDemo) return demoCategories;
     return dbCategories.map(c => c.name);
-  }, [dbCategories, isDemo]);
+  }, [dbCategories, isDemo, demoCategories]);
 
   const metrics = calculateMetrics(transactions);
   const calendarEvents = generateCalendarEvents(transactions);
@@ -152,7 +212,24 @@ function DashboardContent() {
   };
 
   const handleUpdateTransaction = async (updated: Transaction) => {
-    if (isDemo) return;
+    if (isDemo) {
+      if (updated.id.startsWith('new_')) {
+        const finalTx: Transaction = {
+          ...updated,
+          id: `local_${Date.now()}`,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        updateDemoTransactions([finalTx, ...demoTransactions]);
+      } else {
+        const finalTx: Transaction = {
+          ...updated,
+          updated_at: new Date().toISOString(),
+        };
+        updateDemoTransactions(demoTransactions.map(t => t.id === updated.id ? finalTx : t));
+      }
+      return;
+    }
     if (!user) return;
 
     if (updated.id.startsWith('new_')) {
@@ -160,6 +237,15 @@ function DashboardContent() {
     } else {
       await updateTransaction.mutateAsync({ id: updated.id, ...mapTransactionToDB(updated, user.id) });
     }
+  };
+
+  const handleDeleteTransaction = async (id: string) => {
+    if (isDemo) {
+      updateDemoTransactions(demoTransactions.filter(t => t.id !== id));
+      return;
+    }
+    if (!user) return;
+    await deleteTransaction.mutateAsync({ id, userId: user.id });
   };
 
   const handleEventClick = (event: CalendarEvent) => {
@@ -170,15 +256,32 @@ function DashboardContent() {
     }
   };
 
+  const handleCreateNewTransaction = () => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const newTransaction: Transaction = {
+      id: `new_${Date.now()}`,
+      entity: entities[0]?.id || 'oscaromargp',
+      description: 'Nueva transacción',
+      amount: 0,
+      due_date: todayStr,
+      status: 'pending',
+      recurrence: 'none',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    setSelectedTransaction(newTransaction);
+    setIsDrawerOpen(true);
+  };
+
   const handleDateDoubleClick = (date: string) => {
     const newTransaction: Transaction = {
       id: `new_${Date.now()}`,
-      entity: 'oscaromargp',
+      entity: entities[0]?.id || 'oscaromargp',
       description: 'Nueva transacción',
       amount: 0,
       due_date: date,
       status: 'pending',
-      recurrence: 'monthly',
+      recurrence: 'none',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -187,7 +290,17 @@ function DashboardContent() {
   };
 
   const handleImport = async (imported: Partial<Transaction>[]) => {
-    if (isDemo || !user) return;
+    if (isDemo) {
+      const newTransactions = imported.map((t, idx) => ({
+        ...t,
+        id: `imported_${Date.now()}_${idx}_${Math.random()}`,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      } as Transaction));
+      updateDemoTransactions([...newTransactions, ...demoTransactions]);
+      return;
+    }
+    if (!user) return;
     const newTransactions = imported.map((t) => ({
       ...t,
       id: `imported_${Date.now()}_${Math.random()}`,
@@ -227,7 +340,13 @@ function DashboardContent() {
   };
 
   const handleAddCategory = async (category: string) => {
-    if (isDemo || !user) return;
+    if (isDemo) {
+      if (!demoCategories.includes(category)) {
+        updateDemoCategories([...demoCategories, category]);
+      }
+      return;
+    }
+    if (!user) return;
     await createCategory.mutateAsync({
       user_id: user.id,
       name: category,
@@ -238,7 +357,11 @@ function DashboardContent() {
   };
 
   const handleDeleteCategory = async (category: string) => {
-    if (isDemo || !user) return;
+    if (isDemo) {
+      updateDemoCategories(demoCategories.filter(c => c !== category));
+      return;
+    }
+    if (!user) return;
     const cat = dbCategories.find(c => c.name === category);
     if (cat) {
       await deleteCategory.mutateAsync({ id: cat.id, userId: user.id });
@@ -246,7 +369,15 @@ function DashboardContent() {
   };
 
   const handleAddEntity = async (entity: Omit<EntityConfig, 'id'>) => {
-    if (isDemo || !user) return;
+    if (isDemo) {
+      const newEnt: EntityConfig = {
+        ...entity,
+        id: `entity_${Date.now()}`,
+      };
+      updateDemoEntities([...demoEntities, newEnt]);
+      return;
+    }
+    if (!user) return;
     await createEntity.mutateAsync({
       user_id: user.id,
       name: entity.name,
@@ -258,7 +389,11 @@ function DashboardContent() {
   };
 
   const handleUpdateEntity = async (entity: EntityConfig) => {
-    if (isDemo || !user) return;
+    if (isDemo) {
+      updateDemoEntities(demoEntities.map(e => e.id === entity.id ? entity : e));
+      return;
+    }
+    if (!user) return;
     await updateEntity.mutateAsync({
       id: entity.id,
       name: entity.name,
@@ -269,7 +404,11 @@ function DashboardContent() {
   };
 
   const handleDeleteEntity = async (id: string) => {
-    if (isDemo || !user) return;
+    if (isDemo) {
+      updateDemoEntities(demoEntities.filter(e => e.id !== id));
+      return;
+    }
+    if (!user) return;
     await deleteEntity.mutateAsync({ id, userId: user.id });
   };
 
@@ -282,7 +421,7 @@ function DashboardContent() {
     }
   };
 
-  if (authLoading || loadingTransactions || (!user && !isDemo)) {
+  if (authLoading || (!isDemo && loadingTransactions) || (!user && !isDemo)) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
         <div className="w-8 h-8 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
@@ -376,7 +515,10 @@ function DashboardContent() {
                 )}
               </button>
               {activeView !== 'settings' && (
-                <button className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors">
+                <button 
+                  onClick={handleCreateNewTransaction}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors"
+                >
                   <Plus className="w-4 h-4" />
                   Nueva Transacción
                 </button>
@@ -506,7 +648,9 @@ function DashboardContent() {
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         onUpdate={handleUpdateTransaction}
+        onDelete={handleDeleteTransaction}
         allTransactions={transactions}
+        entities={entities}
       />
 
       <PDFReport

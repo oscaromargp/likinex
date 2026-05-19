@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, DollarSign, FileText, Clock, CreditCard, Paperclip, Save, Upload, Trash2, Eye, Download, Image as ImageIcon, Edit3, Plus, History } from 'lucide-react';
-import { Transaction, TransactionStatus, PaymentMethod, ENTITY_LABELS, STATUS_LABELS, Currency, CURRENCY_SYMBOLS, convertCurrency, calculatePunctuality, calculateConsecutiveOnTime, getScoreLabel, Attachment, EntityConfig, DEFAULT_ENTITIES, getEntityIcon, getEntityLabel } from '@/types';
+import { Transaction, TransactionStatus, PaymentMethod, ENTITY_LABELS, STATUS_LABELS, Currency, CURRENCY_SYMBOLS, convertCurrency, calculatePunctuality, calculateConsecutiveOnTime, getScoreLabel, Attachment, EntityConfig, DEFAULT_ENTITIES, getEntityIcon, getEntityLabel, CATEGORY_LABELS } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +21,7 @@ interface SideDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onUpdate?: (transaction: Transaction) => void;
+  onDelete?: (id: string) => void;
   allTransactions?: Transaction[];
   entities?: EntityConfig[];
 }
@@ -39,9 +40,10 @@ interface PaymentRecord {
   notes: string;
 }
 
-export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, allTransactions = [], entities = [] }: SideDrawerProps) {
+export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onDelete, allTransactions = [], entities = [] }: SideDrawerProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'payment' | 'followup' | 'attachments' | 'history'>('details');
   const [isEditing, setIsEditing] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editForm, setEditForm] = useState({
     description: '',
     amount: 0,
@@ -83,7 +85,8 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
         currency: 'MXN',
         displayCurrency: 'MXN'
       });
-      setIsEditing(false);
+      setIsEditing(transaction.id.startsWith('new_'));
+      setShowDeleteConfirm(false);
       loadPaymentRecords();
     }
   }, [transaction?.id]);
@@ -167,16 +170,16 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
       const attachmentUrls = attachments.map(a => a.base64 || a.file_path).join(',');
       onUpdate({
         ...transaction,
-        description: editForm.description || transaction.description,
-        amount: editForm.amount || transaction.amount,
-        due_date: editForm.due_date || transaction.due_date,
-        entity: editForm.entity as any || transaction.entity,
-        category: editForm.category as any || transaction.category,
-        notes: editForm.notes || transaction.notes,
-        payment_method: editForm.payment_method as PaymentMethod || transaction.payment_method,
-        follow_up: editForm.follow_up || transaction.follow_up,
+        description: editForm.description,
+        amount: editForm.amount,
+        due_date: editForm.due_date,
+        entity: editForm.entity || transaction.entity,
+        category: editForm.category || undefined,
+        notes: editForm.notes || undefined,
+        payment_method: (editForm.payment_method as PaymentMethod) || undefined,
+        follow_up: editForm.follow_up || undefined,
         price_change: editForm.price_change || undefined,
-        attachment_url: attachmentUrls || transaction.attachment_url
+        attachment_url: attachmentUrls || undefined
       });
     }
     setIsEditing(false);
@@ -360,19 +363,74 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-4 bg-slate-800/50 rounded-xl">
                       <p className="text-xs text-slate-400 mb-1">Entidad</p>
-                      <p className="text-white font-medium">{ENTITY_LABELS[transaction.entity]}</p>
+                      {isEditing ? (
+                        <select
+                          value={editForm.entity}
+                          onChange={e => setEditForm(f => ({ ...f, entity: e.target.value }))}
+                          className="w-full bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                        >
+                          {entities.map(ent => (
+                            <option key={ent.id} value={ent.id} className="bg-slate-900 text-white">
+                              {ent.icon} {ent.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="text-white font-medium">
+                          {getEntityIcon(transaction.entity, entities)} {getEntityLabel(transaction.entity, entities)}
+                        </p>
+                      )}
                     </div>
                     <div className="p-4 bg-slate-800/50 rounded-xl">
                       <p className="text-xs text-slate-400 mb-1">Estado</p>
                       <select
                         value={transaction.status}
                         onChange={e => onUpdate?.({ ...transaction, status: e.target.value as TransactionStatus })}
-                        className="w-full bg-transparent text-white font-medium focus:outline-none"
+                        className="w-full bg-transparent text-white font-medium focus:outline-none cursor-pointer"
                       >
                         {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                          <option key={key} value={key}>{label}</option>
+                          <option key={key} value={key} className="bg-slate-900 text-white">{label}</option>
                         ))}
                       </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-4 bg-slate-800/50 rounded-xl">
+                      <p className="text-xs text-slate-400 mb-1">Categoría</p>
+                      {isEditing ? (
+                        <select
+                          value={editForm.category}
+                          onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
+                          className="w-full bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                        >
+                          <option value="otro" className="bg-slate-900 text-white">Otro</option>
+                          {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                            key !== 'otro' && (
+                              <option key={key} value={key} className="bg-slate-900 text-white">
+                                {label}
+                              </option>
+                            )
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="text-white font-medium">
+                          {CATEGORY_LABELS[transaction.category as keyof typeof CATEGORY_LABELS] || transaction.category || 'Otro'}
+                        </p>
+                      )}
+                    </div>
+                    <div className="p-4 bg-slate-800/50 rounded-xl">
+                      <p className="text-xs text-slate-400 mb-1">Fecha Límite</p>
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={editForm.due_date}
+                          onChange={e => setEditForm(f => ({ ...f, due_date: e.target.value }))}
+                          className="w-full bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                        />
+                      ) : (
+                        <p className="text-white font-medium">{formatDate(transaction.due_date)}</p>
+                      )}
                     </div>
                   </div>
 
@@ -382,33 +440,42 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
                       <select
                         value={editForm.displayCurrency}
                         onChange={e => setEditForm(f => ({ ...f, displayCurrency: e.target.value as Currency }))}
-                        className="bg-slate-700/50 text-xs text-white px-2 py-1 rounded-lg border border-slate-600"
+                        className="bg-slate-700/50 text-xs text-white px-2 py-1 rounded-lg border border-slate-600 cursor-pointer"
                       >
                         {CURRENCIES.map(c => (
-                          <option key={c} value={c}>{c}</option>
+                          <option key={c} value={c} className="bg-slate-900 text-white">{c}</option>
                         ))}
                       </select>
                     </div>
-                    <p className="text-2xl font-bold text-emerald-400">
-                      {CURRENCY_SYMBOLS[editForm.displayCurrency]}{convertAndDisplay(transaction.amount, 'MXN', editForm.displayCurrency).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </p>
-                    {editForm.displayCurrency !== 'MXN' && (
-                      <p className="text-xs text-slate-500 mt-1">≈ {formatCurrency(transaction.amount)} MXN</p>
+                    {isEditing ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-semibold text-emerald-400">MXN $</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={editForm.amount}
+                          onChange={e => setEditForm(f => ({ ...f, amount: Number(e.target.value) }))}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-lg font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+                    ) : (
+                      <>
+                        <p className="text-2xl font-bold text-emerald-400">
+                          {CURRENCY_SYMBOLS[editForm.displayCurrency]}{convertAndDisplay(transaction.amount, 'MXN', editForm.displayCurrency).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                        {editForm.displayCurrency !== 'MXN' && (
+                          <p className="text-xs text-slate-500 mt-1">≈ {formatCurrency(transaction.amount)} MXN</p>
+                        )}
+                      </>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  {transaction.paid_date && !isEditing && (
                     <div className="p-4 bg-slate-800/50 rounded-xl">
-                      <p className="text-xs text-slate-400 mb-1">Fecha Límite</p>
-                      <p className="text-white font-medium">{formatDate(transaction.due_date)}</p>
+                      <p className="text-xs text-slate-400 mb-1">Fecha de Pago</p>
+                      <p className="text-white font-medium">{formatDate(transaction.paid_date)}</p>
                     </div>
-                    {transaction.paid_date && (
-                      <div className="p-4 bg-slate-800/50 rounded-xl">
-                        <p className="text-xs text-slate-400 mb-1">Fecha de Pago</p>
-                        <p className="text-white font-medium">{formatDate(transaction.paid_date)}</p>
-                      </div>
-                    )}
-                  </div>
+                  )}
 
                   {punctuality && (
                     <div className="p-4 bg-slate-800/50 rounded-xl">
@@ -692,15 +759,73 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, all
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-800/50">
-              <button
-                onClick={handleSave}
-                className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
-              >
-                <Save className="w-4 h-4" />
-                Guardar Cambios
-              </button>
+            <div className="p-6 border-t border-slate-800/50 flex flex-col gap-2">
+              <div className="flex gap-2">
+                {onDelete && !transaction.id.startsWith('new_') && (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                    title="Eliminar Transacción"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
+                <button
+                  onClick={handleSave}
+                  className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <Save className="w-4 h-4" />
+                  Guardar Cambios
+                </button>
+              </div>
             </div>
+            <AnimatePresence>
+              {showDeleteConfirm && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 text-center"
+                >
+                  <motion.div
+                    initial={{ scale: 0.95, y: 10 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.95, y: 10 }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="bg-slate-900 border border-red-500/20 p-6 rounded-2xl max-w-sm w-full space-y-4"
+                  >
+                    <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto">
+                      <Trash2 className="w-6 h-6 text-red-400" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-white">¿Eliminar transacción?</h3>
+                      <p className="text-sm text-slate-400 mt-1">
+                        Esta acción no se puede deshacer. Se eliminará permanentemente la transacción "{transaction.description}".
+                      </p>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => setShowDeleteConfirm(false)}
+                        className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl transition-colors text-sm"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={() => {
+                          onDelete?.(transaction.id);
+                          setShowDeleteConfirm(false);
+                          onClose();
+                        }}
+                        className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors text-sm"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
 
           <AnimatePresence>
