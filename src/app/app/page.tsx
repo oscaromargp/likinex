@@ -796,7 +796,7 @@ function DashboardContent() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <Ledger transactions={transactions} onRowClick={handleTransactionClick} onPrint={handlePrint} attachmentCounts={attachmentCounts} categories={categories} />
+                <Ledger transactions={transactions} onRowClick={handleTransactionClick} onPrint={handlePrint} attachmentCounts={attachmentCounts} categories={categories} entities={entities} />
               </motion.div>
             )}
 

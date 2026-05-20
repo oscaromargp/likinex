@@ -91,7 +91,6 @@ export default function SideDrawer({
     category: '',
     notes: '',
     payment_method: '',
-    follow_up: '',
     price_change: 0,
     currency: 'MXN' as Currency,
     displayCurrency: 'MXN' as Currency,
@@ -136,7 +135,6 @@ export default function SideDrawer({
         category: transaction.category || '',
         notes: transaction.notes || '',
         payment_method: transaction.payment_method || '',
-        follow_up: transaction.follow_up || '',
         price_change: transaction.price_change || 0,
         currency: 'MXN',
         displayCurrency: 'MXN',
@@ -278,17 +276,17 @@ export default function SideDrawer({
 const handleSave = () => {
     const totalPaid = paymentRecords.reduce((sum, r) => sum + r.amount, 0);
     const absAmount = Math.abs(editForm.amount);
-    const isIncome = editForm.amount < 0;
+    const isIncome = editForm.type === 'income';
     
     let calculatedStatus: TransactionStatus = 'pending';
     
     if (isIncome) {
-      calculatedStatus = 'settled';
+      calculatedStatus = totalPaid > 0 ? 'settled' : 'pending';
     } else {
       if (absAmount > 0) {
         calculatedStatus = totalPaid >= absAmount ? 'settled' : (totalPaid > 0 ? 'partial' : 'pending');
       } else {
-        calculatedStatus = 'settled';
+        calculatedStatus = 'pending';
       }
     }
     
@@ -318,7 +316,6 @@ const handleSave = () => {
             category: (editForm.category as Category) || undefined,
             notes: editForm.notes || undefined,
             payment_method: (editForm.payment_method as PaymentMethod) || 'card',
-            follow_up: editForm.follow_up || undefined,
             price_change: editForm.price_change || undefined,
             attachment_url: attachmentUrls || undefined,
             status: 'pending',
@@ -414,7 +411,6 @@ const handleSave = () => {
         category: (editForm.category as Category) || undefined,
         notes: editForm.notes || undefined,
         payment_method: (editForm.payment_method as PaymentMethod) || undefined,
-        follow_up: editForm.follow_up || undefined,
         price_change: editForm.price_change || undefined,
         attachment_url: attachmentUrls || undefined,
         status: calculatedStatus,
@@ -439,7 +435,6 @@ const handleSave = () => {
         category: (editForm.category as Category) || undefined,
         notes: editForm.notes || undefined,
         payment_method: (editForm.payment_method as PaymentMethod) || undefined,
-        follow_up: editForm.follow_up || undefined,
         price_change: editForm.price_change || undefined,
         attachment_url: attachmentUrls || undefined,
         status: calculatedStatus,
@@ -1067,25 +1062,6 @@ const handleSave = () => {
                         ) : (
                           <p className="text-white text-xs font-semibold">
                             {PAYMENT_METHODS.find(m => m.value === transaction.payment_method)?.icon || '📦'} {PAYMENT_METHODS.find(m => m.value === transaction.payment_method)?.label || 'Otro'}
-                          </p>
-                        )}
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block mb-1">Seguimiento</label>
-                        {isEditing ? (
-                          <>
-                            <input
-                              type="datetime-local"
-                              value={editForm.follow_up}
-                              onChange={e => setEditForm(f => ({ ...f, follow_up: e.target.value }))}
-                              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none"
-                            />
-                            <p className="text-xs text-slate-500 mt-1">Recordatorio opcional para seguir la operacion (ej. llamada de confirmacion).</p>
-                          </>
-                        ) : (
-                          <p className="text-white text-xs font-medium">
-                            {transaction.follow_up ? formatDate(transaction.follow_up) : 'Sin recordatorio'}
                           </p>
                         )}
                       </div>

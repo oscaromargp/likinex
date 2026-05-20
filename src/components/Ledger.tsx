@@ -16,6 +16,7 @@ import {
   CATEGORY_LABELS,
   CATEGORY_LABELS as CATEGORIES,
   RecurrenceType,
+  EntityConfig,
   calculatePunctuality, 
   calculateConsecutiveOnTime 
 } from '@/types';
@@ -34,6 +35,7 @@ interface LedgerProps {
   ) => void;
   attachmentCounts?: Record<string, number>;
   categories?: string[];
+  entities?: EntityConfig[];
 }
 
 type SortField = 'description' | 'entity' | 'amount' | 'due_date' | 'status';
@@ -43,7 +45,7 @@ const formatDateStr = (date: Date): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 };
 
-export default function Ledger({ transactions, onRowClick, onPrint, attachmentCounts = {}, categories: customCategories = [] }: LedgerProps) {
+export default function Ledger({ transactions, onRowClick, onPrint, attachmentCounts = {}, categories: customCategories = [], entities = [] }: LedgerProps) {
   const [filters, setFilters] = useState<FilterState>({
     entity: 'all',
     status: 'all',
@@ -61,7 +63,19 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
   const [printDateFrom, setPrintDateFrom] = useState('');
   const [printDateTo, setPrintDateTo] = useState('');
 
-  const allCategories = customCategories.length > 0 ? customCategories : Object.keys(CATEGORIES);
+  const allCategories = useMemo(() => {
+    const defaults = Object.keys(CATEGORIES);
+    const merged = [...new Set([...defaults, ...customCategories])];
+    return merged;
+  }, [customCategories]);
+
+  const allEntities = useMemo(() => {
+    const defaultEnts = Object.entries(ENTITY_LABELS).map(([id, label]) => ({ id, label }));
+    const customEnts = entities
+      .filter(e => e.is_active && !ENTITY_LABELS[e.id])
+      .map(e => ({ id: e.id, label: e.name }));
+    return [...defaultEnts, ...customEnts];
+  }, [entities]);
 
   const generateVirtualProjections = (txs: Transaction[]): Transaction[] => {
     const projected: Transaction[] = [];
@@ -284,8 +298,8 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
               className="px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
             >
               <option value="all">Todas las entidades</option>
-              {Object.entries(ENTITY_LABELS).map(([key, label]) => (
-                <option key={key} value={key}>{label}</option>
+              {allEntities.map(ent => (
+                <option key={ent.id} value={ent.id}>{ent.label}</option>
               ))}
             </select>
 
