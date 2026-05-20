@@ -1,409 +1,109 @@
-# 💰 LikinEX - El Orquestador de Liquidez
+# 💰 LikinEX - Advanced Liquidity Orchestrator / Orquestador de Liquidez Avanzado
 
-![LikinEX Banner](https://via.placeholder.com/1200x400/020617/10B981?text=LikinEX+-+El+Orquestador+de+Liquidez)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Foscaromargp%2Flikinex&project-name=likinex-app&repository-name=likinex-app)
 
-<div align="center">
+*LikinEX is an open-source "Financial Second Brain" designed to track complex liquidity, recurrent payments, staggered invoices, and enriched contact relationships without the bloat of traditional ERPs.*
 
-[![Next.js](https://img.shields.io/badge/Next.js-16-black?style=flat&logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=flat&logo=typescript)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-4-38BDF8?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
-[![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=flat&logo=supabase)](https://supabase.com/)
-[![Framer Motion](https://img.shields.io/badge/Framer-Motion-white?style=flat&logo=framer)](https://www.framer.com/motion/)
-
-**Segundo Cerebro Financiero para Gestión de Liquidez de Alta Complejidad**
-
-</div>
+*(ES)* *LikinEX es un "Segundo Cerebro Financiero" de código abierto diseñado para rastrear liquidez compleja, pagos recurrentes, facturas escalonadas y relaciones de contacto enriquecidas sin la pesadez de los ERP tradicionales.*
 
 ---
 
-## 📋 Tabla de Contenidos
+## 🌐 Live Demo / Demostración en Vivo
 
-- [Características](#-características)
-- [Vista Previa](#-vista-previa)
-- [Tech Stack](#-tech-stack)
-- [Estructura del Proyecto](#-estructura-del-proyecto)
-- [Instalación](#-instalación)
-- [Configuración de Supabase](#-configuración-de-supabase)
-- [Configuración de n8n (Automatización)](#-configuración-de-n8n-automatización)
-- [Entidades y Datos](#-entidades-y-datos)
-- [Ciclo de Transacción](#-ciclo-de-transacción)
-- [Desarrollo](#-desarrollo)
-- [Roadmap](#-roadmap)
-- [Licencia](#-licencia)
+**Try it right now! / ¡Pruébalo ahora mismo!**
+👉 **[https://likinex.vercel.app](https://likinex.vercel.app)** 👈
+
+No setup required. The demo mode runs entirely on your local browser (LocalStorage) so you can test all features privately before connecting it to a database!
+
+*(ES)* No requiere configuración. ¡El modo de prueba corre completamente en tu navegador (LocalStorage) para que puedas probar todas las funciones de forma privada antes de conectarlo a una base de datos!
 
 ---
 
-## ✨ Características
+## 📸 Screenshots / Capturas de Pantalla
 
-### 🎯 Funcionalidades Principales
+*(Wait for the images to load to see the beautiful UI in action)*
 
-| Característica | Descripción |
-|----------------|-------------|
-| **Calendario Interactivo** | Visualización mensual con drag-and-drop para reprogramar y recurrencias automáticas |
-| **Meses Sin Intereses (MSI)** | Generador automático de mensualidades amortizadas en un solo paso |
-| **Libro Mayor** | Tabla avanzada con filtros por entidad, estado, fecha y monto |
-| **Métricas en Tiempo Real** | Cálculo de Committed vs. Settled cash flow y runway de caja |
-| **Seguridad por Entidades** | 7 cuentas segregadas con seguimiento individual |
-| **Drawer de Gestión** | Seguimiento de follow-ups, pagos, adjuntos y cambios de precio |
-| **Comprobantes Electrónicos** | Generación de CEP (Comprobante Electrónico de Pago) en PDF con desglose de amortizaciones parciales |
-| **Contactos Enriquecidos** | Perfiles detallados con múltiples bancos, direcciones, teléfonos, reputación e histórico de operaciones |
+### 1. Unified Dashboard (Panel Unificado)
+> Visual overview of your committed capital vs available funds.
+![Dashboard Overview](https://raw.githubusercontent.com/oscaromargp/likinex/main/public/screenshots/dashboard.jpg)
 
-### 🔄 Tipos de Recurrencia
+### 2. Kanban & Calendar view (Vista de Calendario y Pagos)
+> Drag and drop payments, see upcoming deadlines with automatic visual alerts.
+![Calendar View](https://raw.githubusercontent.com/oscaromargp/likinex/main/public/screenshots/calendar.jpg)
 
-- **Semanal** (ej: Todos los viernes)
-- **Mensual** (ej: Día 15 de cada mes)
-- **Bimestral** (ej: CFE cada 2 meses)
-- **Trimestral** (ej: Gas natural cada 3 meses)
-- **Trienal** (ej: Dominios web cada 3 años)
+### 3. Enriched Contacts CRM (Contactos Enriquecidos)
+> Keep track of unlimited bank accounts, addresses, emails, and a historical **Reputation Score** for each contact or supplier!
+![Contacts CRM](https://raw.githubusercontent.com/oscaromargp/likinex/main/public/screenshots/contacts.jpg)
 
-### ⚠️ Sistema de Alertas
-
-- Transacciones pendientes con menos de 72 horas
-- Anomalías detectadas (ej: CFE > $10,000 MXN)
-- Recordatorios de seguimiento configurables
+### 4. Premium Payment Vouchers (Comprobantes Electrónicos de Pago)
+> Export beautiful PDF vouchers with pie charts showing partial amortizations and payment history.
+![Payment Voucher PDF](https://raw.githubusercontent.com/oscaromargp/likinex/main/public/screenshots/receipt.jpg)
 
 ---
 
-## 👁️ Vista Previa
+## ✨ Key Features / Características Principales
 
-### Dashboard Principal
+### 🇬🇧 English
+- **Zero-Config Demo Mode:** Start instantly using your browser's LocalStorage.
+- **Deep Contact Nutrition:** Store multiple banks, CLABEs, phone numbers, and digital footprint for each supplier.
+- **Reputation Tracking:** Tag suppliers with Positive/Negative notes so your team knows who to trust.
+- **Payment Deadlines vs Ideal Dates:** Understand your real runway by setting tolerance days and forcing justifications for late payments.
+- **Bank-Grade PDF Vouchers:** Export a gorgeous, SVG-powered "Electronic Payment Voucher" showing amortization history.
+- **Micro-animations & Premium UI:** Built with Tailwind V4, Framer Motion, and Lucide React.
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  LikinEX - El Orquestador de Liquidez                                       │
-├──────────┬──────────────────────────────────────────────────────────────────┤
-│          │                                                                       │
-│ Dashboard │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐           │
-│ Calendario│  │Comprometido│ │Liquidado │ │Pendiente │ │Disponible│           │
-│ Transac. │  │  $245,000 │ │  $198,500 │ │ $46,500  │ │ $198,500 │           │
-│          │  └──────────┘ └──────────┘ └──────────┘ └──────────┘           │
-│          │                                                                       │
-│ Config.  │  ┌─────────────────────────────┐ ┌──────────────────────────┐    │
-│          │  │       CALENDARIO            │ │  TRANSACCIONES RECIENTES │    │
-│          │  │  ┌────────────────────┐   │ │  CFE Electricidad      $2,450   │
-│          │  │  │ Lu Ma Mi Ju Vi Sa Do│   │ │  Telmex Internet       $899    │
-│          │  │  │       ●  ●  ●        │   │ │  Gas Natural          $1,200   │
-│          │  │  └────────────────────┘   │ │  Dominios Web          $450    │
-│          │  └─────────────────────────────┘ └──────────────────────────┘    │
-└──────────┴──────────────────────────────────────────────────────────────────┘
-```
-
-### Landing Page
-
-Visítala en: `/landing/index.html`
+### 🇪🇸 Español
+- **Modo Demo Sin Configuración:** Comienza al instante usando el LocalStorage de tu navegador.
+- **Nutrición Profunda de Contactos:** Almacena múltiples bancos, CLABEs, teléfonos y huella digital para cada proveedor.
+- **Historial de Reputación:** Etiqueta proveedores con notas Positivas/Negativas para que tu equipo sepa en quién confiar.
+- **Diferenciación de Prórrogas (Deadlines):** Comprende tu liquidez real fijando días de tolerancia y obligando a justificar los pagos atrasados.
+- **Comprobantes PDF Nivel Bancario:** Exporta un hermoso "Comprobante Electrónico de Pago" con gráficos y el historial de amortizaciones.
+- **UI Premium y Micro-animaciones:** Construido con Tailwind V4, Framer Motion y Lucide React.
 
 ---
 
-## 🛠️ Tech Stack
+## 🚀 How to use it / Cómo usarlo (No code required)
 
-| Tecnología | Propósito |
-|------------|-----------|
-| **Next.js 16** | Framework React con App Router |
-| **TypeScript** | Tipado estático seguro |
-| **Tailwind CSS 4** | Estilizado con utility classes |
-| **Framer Motion** | Animaciones fluidas |
-| **Supabase** | Backend-as-a-Service (Auth + DB + Storage) |
-| **Lucide React** | Iconos profesionales |
-| **date-fns** | Manipulación de fechas |
+The easiest way to use LikinEX is to deploy it directly to Vercel and use it in "Demo Mode" (Local Storage).
 
----
+### Option 1: 1-Click Deploy (Vercel)
+1. Click the **"Deploy with Vercel"** button at the top of this file.
+2. Vercel will clone this repository to your GitHub and build it for free.
+3. Open the generated URL and start managing your liquidity immediately.
 
-## 📁 Estructura del Proyecto
-
-```
-LikinEX/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx          # Página principal de la app
-│   │   ├── layout.tsx        # Layout raíz con fuentes
-│   │   └── globals.css      # Estilos globales
-│   ├── components/
-│   │   ├── Calendar.tsx      # Calendario interactivo
-│   │   ├── Ledger.tsx        # Tabla de transacciones
-│   │   ├── SideDrawer.tsx    # Panel lateral de gestión
-│   │   └── MetricsCards.tsx  # Tarjetas de métricas
-│   ├── lib/
-│   │   ├── supabase.ts       # Cliente de Supabase
-│   │   ├── mockData.ts       # Datos de ejemplo
-│   │   └── utils.ts          # Utilidades
-│   ├── types/
-│   │   └── index.ts          # Definiciones de tipos
-│   └── hooks/                # Hooks personalizados (futuro)
-├── landing/
-│   └── index.html           # Landing page standalone
-├── public/                  # Archivos estáticos
-├── package.json
-├── tsconfig.json
-├── tailwind.config.ts
-└── next.config.ts
-```
-
----
-
-## 🚀 Instalación
-
-### Prerrequisitos
-
-- Node.js 18+
-- npm o yarn
-
-### Pasos
-
-1. **Clonar el repositorio**
-
+### Option 2: Run it locally (Desarrollo Local)
+If you are a developer and want to run it on your machine:
 ```bash
-git clone https://github.com/tu-usuario/likinex.git
+git clone https://github.com/oscaromargp/likinex.git
 cd likinex
-```
-
-2. **Instalar dependencias**
-
-```bash
 npm install
-```
-
-3. **Configurar variables de entorno**
-
-```bash
-cp .env.example .env.local
-```
-
-Edita `.env.local` con tus credenciales de Supabase:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=tu_url_de_supabase
-NEXT_PUBLIC_SUPABASE_ANON_KEY=tu_clave_anonima
-```
-
-4. **Iniciar el servidor de desarrollo**
-
-```bash
 npm run dev
 ```
-
-5. **Abrir en navegador**
-
-- App: http://localhost:3000
-- Landing: http://localhost:3000/landing
+Open `http://localhost:3000` in your browser.
 
 ---
 
-## 🔥 Configuración de Supabase
+## ⚙️ Connecting to a Database (Optional) / Conexión a Base de Datos (Opcional)
 
-### Tablas Necesarias
+If you want to sync your data across devices, LikinEX supports Supabase natively!
 
-```sql
--- Transacciones
-CREATE TABLE transactions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  template_id UUID,
-  entity TEXT NOT NULL,
-  description TEXT NOT NULL,
-  amount DECIMAL(12,2) NOT NULL,
-  due_date DATE NOT NULL,
-  paid_date DATE,
-  status TEXT DEFAULT 'pending',
-  recurrence TEXT DEFAULT 'none',
-  recurrence_day INT,
-  payment_method TEXT,
-  notes TEXT,
-  follow_up TIMESTAMP,
-  attachment_url TEXT,
-  price_change DECIMAL(12,2),
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-
--- Plantillas
-CREATE TABLE templates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  entity TEXT NOT NULL,
-  description TEXT NOT NULL,
-  amount DECIMAL(12,2) NOT NULL,
-  recurrence TEXT DEFAULT 'none',
-  recurrence_day INT,
-  payment_method TEXT,
-  notes TEXT,
-  is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- Adjuntos
-CREATE TABLE attachments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  transaction_id UUID REFERENCES transactions(id),
-  file_name TEXT NOT NULL,
-  file_path TEXT NOT NULL,
-  file_type TEXT,
-  file_size INT,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
-
-### Bucket de Almacenamiento
-
-Crea un bucket llamado `receipts` en Supabase Storage para guardar los PDFs de comprobantes.
-
-### Row Level Security (RLS)
-
-```sql
--- Habilitar RLS
-ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
-
--- Política de lectura para usuarios autenticados
-CREATE POLICY "Usuarios pueden ver sus transacciones"
-ON transactions FOR SELECT
-TO authenticated
-USING (true);
-
--- Política de inserción
-CREATE POLICY "Usuarios pueden insertar transacciones"
-ON transactions FOR INSERT
-TO authenticated
-WITH CHECK (true);
-```
+1. Create a free project on [Supabase](https://supabase.com).
+2. Copy your URL and Anon Key.
+3. Add them as Environment Variables in Vercel (or in a `.env.local` file locally):
+   ```
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+4. LikinEX will automatically switch from LocalStorage to the Cloud!
 
 ---
 
-## 🤖 Configuración de n8n (Automatización)
-
-### Objetivo
-
-Automatizar la ingestión de facturas CFE/Telmex directamente desde el email.
-
-### Flujo de n8n
-
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   IMAP     │───▶│  OpenAI     │───▶│   HTTP      │───▶│  Supabase   │
-│ (Email)    │    │ (Extract)   │    │  (Webhook)  │    │   (Push)    │
-└─────────────┘    └─────────────┘    └─────────────┘    └─────────────┘
-```
-
-### Nodos
-
-1. **IMAP Email** - Configura tu email para recibir facturas
-2. **OpenAI** - Extrae datos: monto, fecha, entidad, descripción
-3. **HTTP Request** - Envía a webhook de la app o directamente a Supabase
-
-### Ejemplo de webhook
-
-```
-POST https://tu-app.vercel.app/api/webhooks/n8n
-Content-Type: application/json
-
-{
-  "entity": "oscaromargp",
-  "description": "CFE Electricidad",
-  "amount": 2450.00,
-  "due_date": "2024-06-15",
-  "recurrence": "bimonthly",
-  "source": "n8n-auto"
-}
-```
+## 👨‍💻 Tech Stack
+- Next.js 16 (App Router)
+- React 19
+- Tailwind CSS v4
+- Framer Motion
+- Lucide React Icons
+- Supabase (Optional Backend)
 
 ---
-
-## 🏦 Entidades y Datos
-
-| Entidad | Descripción | Color |
-|---------|-------------|-------|
-| `oscaromargp` | Cuenta principal Oscaromar GP | Emerald |
-| `centenario` | Cuenta Centenario | Indigo |
-| `tulum` | Cuenta Tulum | Pink |
-| `paypaps` | PayPal/PayPals | Blue |
-| `bnrecords` | BN Records | Amber |
-| `pardesantos` | Pardesantos | Cyan |
-| `zxyw` | XYZW Genérica | Violet |
-
----
-
-## 🔄 Ciclo de Transacción
-
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  Template    │────▶│   Instance   │────▶│  Settlement  │
-│  (Plantilla) │     │  (Instancia) │     │  (Liquidado)│
-└──────────────┘     └──────────────┘     └──────────────┘
-      │                    │                      │
-      ▼                    ▼                      ▼
-  Crear plantilla    Pago programado o        Confirmar y cerrar
-                     automático
-```
-
-### Estados
-
-- **pending** - Pendiente de pago
-- **partial** - Liquidado de forma parcial (con abonos)
-- **settled** - Liquidado/completado en su totalidad
-- **cancelled** - Cancelado
-
----
-
-## 🧑‍💻 Desarrollo
-
-### Scripts Disponibles
-
-```bash
-npm run dev      # Iniciar servidor de desarrollo
-npm run build    # Construir para producción
-npm run start    # Iniciar servidor de producción
-npm run lint     # Ejecutar linter
-```
-
----
-
-## 🗺️ Roadmap
-
-### Fase 1 (Actual)
-- ✅ Dashboard con métricas y pronóstico de flujo de caja
-- ✅ Calendario interactivo con vista mensual premium y drag-and-drop de eventos
-- ✅ Libro mayor con filtros, ordenación y exportación de datos
-- ✅ SideDrawer unificado y simplificado para gestión avanzada (Detalles vs Ejecución)
-- ✅ Módulo de Contactos y Directorio con copiado rápido de cuentas bancarias y CLABE
-- ✅ Estatus de Pago Parcial automático al añadir abonos/parcialidades a una operación
-- ✅ Generador automático de mensualidades a Meses Sin Intereses (MSI)
-
-### Fase 2
-- [x] Correcciones de tipado y seguridad de variables de entorno de Supabase en compilaciones estáticas
-- [x] Módulo integrado de directorio de beneficiarios/contactos y pre-llenado de cuentas
-- [ ] Autenticación de usuarios completa (Supabase Auth)
-- [ ] Sincronización completa con Supabase Database
-- [ ] Subida de archivos / PDFs a Supabase Storage
-
-### Fase 3
-- [ ] Integración n8n para automatización de facturas por email
-- [ ] Notificaciones y recordatorios push/email
-- [ ] Reportes analíticos y gráficos avanzados de runway financiero
-
-### Fase 4
-- [ ] App móvil multiplataforma (React Native/Expo)
-- [ ] Integración bancaria directa
-- [ ] Modelado de predicción de flujo con Inteligencia Artificial
-
----
-
-## 📜 Licencia
-
-MIT License - Ver [LICENSE](LICENSE) para más detalles.
-
----
-
-## 🙏 Agradecimientos
-
-> *"Porque Dios es el que en vosotros produce así el querer como el hacer, por su buena voluntad."*
-> — Filipenses 2:13
-
-Todo lo que aquí existe nació primero como un deseo en el corazón. Cada proyecto, cada línea, cada idea que toma forma — es un regalo de Aquel que nos dio tanto el sueño como la fuerza de alcanzarlo.
-
-**A Dios, toda la gloria.**
-
----
-
-<div align="center">
-
-**Construido con ❤️ usando Next.js, TypeScript y Tailwind CSS**
-
-[Ver en GitHub](https://github.com/oscaromargp/likinex)
-
-</div># Force redeploy vie 15 may 2026 08:58:13 MST
+*Built with love for high-performance financial management. / Construido con amor para la gestión financiera de alto rendimiento.*
