@@ -138,7 +138,7 @@ function DashboardContent() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showPDFReport, setShowPDFReport] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [printFilters, setPrintFilters] = useState({ dateRange: { start: null as string | null, end: null as string | null }, entity: 'all' as any });
+  const [printFilters, setPrintFilters] = useState<{ dateRange: { start: string | null, end: string | null }, entity: string, category: string, status: string, type: string }>({ dateRange: { start: null, end: null }, entity: 'all', category: 'all', status: 'all', type: 'all' });
   const [showDropConfirm, setShowDropConfirm] = useState<{ eventId: string; oldDate: string; newDate: string; toleranceDays: number } | null>(null);
 
   // Estados locales para el modo Demo interactivo
@@ -505,8 +505,8 @@ function DashboardContent() {
     URL.revokeObjectURL(url);
   };
 
-  const handlePrint = (dateRange: { start: string | null; end: string | null }, entity: any) => {
-    setPrintFilters({ dateRange, entity });
+  const handlePrint = (dateRange: { start: string | null; end: string | null }, entity: any, category: string, status: any, type: string) => {
+    setPrintFilters({ dateRange, entity, category, status, type });
     setShowPDFReport(true);
     setTimeout(() => {
       window.print();
@@ -854,6 +854,9 @@ function DashboardContent() {
         transactions={transactions}
         dateRange={printFilters.dateRange}
         entityFilter={printFilters.entity}
+        categoryFilter={printFilters.category}
+        statusFilter={printFilters.status as any}
+        typeFilter={printFilters.type as any}
         isVisible={showPDFReport}
       />
 

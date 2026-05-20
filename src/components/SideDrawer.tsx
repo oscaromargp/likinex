@@ -801,36 +801,8 @@ const handleSave = () => {
                   </div>
 
                   {/* Dates & Recurrence */}
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-3">
                     <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
-                      <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Fecha de Pago (Ideal)</p>
-                      {isEditing ? (
-                        <input
-                          type="date"
-                          value={editForm.due_date}
-                          onChange={e => setEditForm(f => ({ ...f, due_date: e.target.value, deadline_date: f.deadline_date || e.target.value }))}
-                          className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
-                        />
-                      ) : (
-                        <p className="text-white text-sm font-medium">{formatDate(transaction.due_date)}</p>
-                      )}
-                    </div>
-                    
-                    <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
-                      <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Fecha Límite (Prórroga)</p>
-                      {isEditing ? (
-                        <input
-                          type="date"
-                          value={editForm.deadline_date || editForm.due_date}
-                          onChange={e => setEditForm(f => ({ ...f, deadline_date: e.target.value }))}
-                          className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
-                        />
-                      ) : (
-                        <p className="text-white text-sm font-medium">{transaction.deadline_date ? formatDate(transaction.deadline_date) : formatDate(transaction.due_date)}</p>
-                      )}
-                    </div>
-
-                    <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl col-span-2">
                       <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Periodicidad / Recurrencia</p>
                       {isEditing ? (
                         <select
@@ -849,9 +821,9 @@ const handleSave = () => {
                           🔄 {RECURRENCE_OPTIONS.find(o => o.value === transaction.recurrence)?.label || 'Sin recurrencia'}
                         </p>
                       )}
-                      {editForm.recurrence === 'semi_monthly' && (
+                      {editForm.recurrence === 'semi_monthly' && isEditing && (
                         <div className="mt-3 p-3 bg-slate-800/30 rounded-lg border border-slate-700/30">
-                          <p className="text-[10px] text-slate-500 mb-2">Días de vencimiento:</p>
+                          <p className="text-[10px] text-slate-500 mb-2">Dias de vencimiento:</p>
                           <div className="flex gap-2">
                             {[1, 15].map(day => (
                               <label key={day} className="flex items-center gap-1.5 cursor-pointer">
@@ -866,7 +838,7 @@ const handleSave = () => {
                                   }}
                                   className="w-4 h-4 rounded bg-slate-700 border-slate-600 text-emerald-500 focus:ring-emerald-500"
                                 />
-                                <span className="text-xs text-white">{day === 1 ? 'Día 1' : 'Día 15'}</span>
+                                <span className="text-xs text-white">{day === 1 ? 'Dia 1' : 'Dia 15'}</span>
                               </label>
                             ))}
                           </div>
@@ -874,9 +846,50 @@ const handleSave = () => {
                       )}
                     </div>
 
+                    {editForm.recurrence !== 'none' ? (
+                      <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                        <p className="text-[10px] text-indigo-400 mb-1 font-semibold uppercase tracking-wider">Fechas Automaticas</p>
+                        <p className="text-xs text-indigo-300">
+                          Las fechas se calculan automaticamente segun la recurrencia seleccionada.
+                        </p>
+                        <p className="text-xs text-slate-400 mt-1">
+                          Proxima fecha: <span className="text-white font-medium">{formatDate(editForm.due_date)}</span>
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
+                          <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Fecha de Pago</p>
+                          {isEditing ? (
+                            <input
+                              type="date"
+                              value={editForm.due_date}
+                              onChange={e => setEditForm(f => ({ ...f, due_date: e.target.value, deadline_date: f.deadline_date || e.target.value }))}
+                              className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
+                            />
+                          ) : (
+                            <p className="text-white text-sm font-medium">{formatDate(transaction.due_date)}</p>
+                          )}
+                        </div>
+                        <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
+                          <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Fecha Limite</p>
+                          {isEditing ? (
+                            <input
+                              type="date"
+                              value={editForm.deadline_date || editForm.due_date}
+                              onChange={e => setEditForm(f => ({ ...f, deadline_date: e.target.value }))}
+                              className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
+                            />
+                          ) : (
+                            <p className="text-white text-sm font-medium">{transaction.deadline_date ? formatDate(transaction.deadline_date) : formatDate(transaction.due_date)}</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Tolerance Days */}
                     <div className="p-3 bg-slate-800/30 rounded-lg border border-slate-700/30">
-                      <label className="text-[10px] text-slate-500 block mb-1">Días de tolerancia después del vencimiento</label>
+                      <label className="text-[10px] text-slate-500 block mb-1">Dias de tolerancia</label>
                       {isEditing ? (
                         <select
                           value={editForm.tolerance_days ?? 2}
@@ -884,12 +897,12 @@ const handleSave = () => {
                           className="w-full bg-slate-800 p-2 rounded-lg text-sm text-white focus:outline-none"
                         >
                           {[0, 1, 2, 3, 5, 7, 10].map(d => (
-                            <option key={d} value={d}>{d === 0 ? 'Sin tolerancia' : `${d} día${d > 1 ? 's' : ''}`}</option>
+                            <option key={d} value={d}>{d === 0 ? 'Sin tolerancia' : `${d} dia${d > 1 ? 's' : ''}`}</option>
                           ))}
                         </select>
                       ) : (
                         <p className="text-sm text-slate-400">
-                          {editForm.tolerance_days ?? 2} día{editForm.tolerance_days !== 1 ? 's' : ''} de gracia
+                          {editForm.tolerance_days ?? 2} dia{editForm.tolerance_days !== 1 ? 's' : ''} de gracia
                         </p>
                       )}
                     </div>

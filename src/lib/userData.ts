@@ -431,8 +431,16 @@ export const calculateMetrics = (transactions: Transaction[]): LiquidityMetrics 
 
 export const generateCalendarEvents = (transactions: Transaction[]): CalendarEvent[] => {
   const events: CalendarEvent[] = [];
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const oneWeekFromNow = new Date(now);
+  oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
 
   transactions.forEach(t => {
+    const txDate = new Date(t.due_date);
+    txDate.setHours(0, 0, 0, 0);
+    const isClose = txDate <= oneWeekFromNow;
+
     events.push({
       id: t.id,
       title: t.description,
@@ -440,12 +448,17 @@ export const generateCalendarEvents = (transactions: Transaction[]): CalendarEve
       amount: t.amount,
       entity: t.entity,
       status: t.status,
-      isInstance: true
+      isInstance: true,
+      isProjection: !isClose && t.status === 'pending'
     });
 
     if (t.recurrence !== 'none' && t.status === 'pending') {
-      const projections = generateProjections(t, 12);
+      const projections = generateProjections(t, 24);
       projections.forEach((proj, idx) => {
+        const projDate = new Date(proj.date);
+        projDate.setHours(0, 0, 0, 0);
+        const projIsClose = projDate <= oneWeekFromNow;
+        
         events.push({
           id: `${t.id}-proj-${idx}`,
           title: t.description,
@@ -454,7 +467,7 @@ export const generateCalendarEvents = (transactions: Transaction[]): CalendarEve
           entity: t.entity,
           status: 'pending' as const,
           isInstance: false,
-          isProjection: true
+          isProjection: !projIsClose
         });
       });
     }
@@ -467,6 +480,7 @@ function generateProjections(transaction: Transaction, monthsAhead: number): { d
   const projections: { date: string }[] = [];
   const baseDate = new Date(transaction.due_date);
   const now = new Date();
+  now.setHours(0, 0, 0, 0);
   const limitDate = new Date(now.getFullYear(), now.getMonth() + monthsAhead, 0);
 
   if (baseDate >= limitDate) return projections;
@@ -491,7 +505,6 @@ function generateProjections(transaction: Transaction, monthsAhead: number): { d
       break;
     }
     case 'semi_monthly': {
-      // Genera instancias para los días 1 y 15 de cada mes
       const targetDays = transaction.recurrence_days || [1, 15];
       const baseYear = now.getFullYear();
       const baseMonth = now.getMonth();
@@ -505,9 +518,7 @@ function generateProjections(transaction: Transaction, monthsAhead: number): { d
           const actualDay = Math.min(day, daysInMonth);
           const projDate = new Date(year, month, actualDay);
           
-          // Solo incluir si es futura y no es la fecha base
           if (projDate > now && projDate >= baseDate && projDate <= limitDate) {
-            // Evitar duplicados con la fecha base
             if (projDate.getTime() !== baseDate.getTime()) {
               projections.push({ date: formatDate(projDate) });
             }

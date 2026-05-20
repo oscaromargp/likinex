@@ -213,14 +213,12 @@ export interface Contact {
   id: string;
   name: string;
   email?: string;
-  // Legacy fields (kept for backward compatibility, mapped to new arrays when needed)
   phone?: string;
   address?: string;
   bank_name?: string;
   bank_account?: string;
   bank_clabe?: string;
   
-  // New Enriched Fields
   bank_accounts?: BankAccount[];
   phones?: PhoneNumber[];
   addresses?: Address[];
@@ -232,6 +230,10 @@ export interface Contact {
   notes?: string;
   created_at: string;
   updated_at: string;
+  
+  // New fields
+  tags?: string[];
+  photo_url?: string;
 }
 
 export interface LiquidityMetrics {
