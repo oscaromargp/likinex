@@ -10,11 +10,12 @@ interface CalendarProps {
   events: CalendarEvent[];
   onEventClick?: (event: CalendarEvent) => void;
   onDateDoubleClick?: (date: string) => void;
+  onEventDrop?: (eventId: string, newDate: string) => void;
 }
 
 type ViewMode = 'grid' | 'table';
 
-export default function Calendar({ events, onEventClick, onDateDoubleClick }: CalendarProps) {
+export default function Calendar({ events, onEventClick, onDateDoubleClick, onEventDrop }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
@@ -125,18 +126,17 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick }: Ca
           <div className="grid grid-cols-7 gap-1">
             {days.map((day, idx) => {
               if (!day) {
-                return <div key={`empty-${idx}`} className="h-20" />;
+                return <div key={`empty-${idx}`} className="h-24" />;
               }
 
               const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const dayEvents = getEventsForDay(day);
               const today = isToday(dateStr);
-              const urgent = dayEvents.some(e => isUrgent(e.date));
               const isSelected = selectedDate === dateStr;
               const hasProjections = dayEvents.some(e => e.isProjection);
 
               return (
-                <button
+                <div
                   key={day}
                   onClick={() => setSelectedDate(dateStr)}
                   onDoubleClick={() => onDateDoubleClick?.(dateStr)}
@@ -144,34 +144,68 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick }: Ca
                     e.preventDefault();
                     setContextMenu({ x: e.clientX, y: e.clientY, date: dateStr });
                   }}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const eventId = e.dataTransfer.getData('text/plain');
+                    if (eventId && onEventDrop) {
+                      onEventDrop(eventId, dateStr);
+                    }
+                  }}
                   className={`
-                    h-20 p-1 rounded-lg transition-all relative flex flex-col items-start
-                    ${isSelected ? 'bg-emerald-500/20 border border-emerald-500/40' : 'bg-slate-800/30 hover:bg-slate-700/50 border border-transparent'}
-                    ${hasProjections ? 'ring-1 ring-indigo-500/30' : ''}
+                    h-24 p-1.5 rounded-lg transition-all relative flex flex-col items-start cursor-pointer select-none overflow-hidden border
+                    ${isSelected ? 'bg-emerald-500/10 border-emerald-500/40 shadow-inner' : 'bg-slate-800/30 hover:bg-slate-800/50 border-slate-800/40'}
+                    ${hasProjections ? 'ring-1 ring-indigo-500/20' : ''}
                   `}
                 >
                   <span className={`
-                    text-sm font-medium w-6 h-6 flex items-center justify-center rounded-full
+                    text-xs font-semibold w-5 h-5 flex items-center justify-center rounded-full mb-1
                     ${today ? 'bg-emerald-500 text-white' : 'text-slate-400'}
                   `}>
                     {day}
                   </span>
-                  <div className="flex gap-1 mt-1 flex-wrap">
-                    {dayEvents.slice(0, 3).map((e, i) => (
-                      <div
-                        key={i}
-                        className={`w-2 h-2 rounded-full ${
-                          e.isProjection ? 'bg-indigo-400' :
-                          e.status === 'settled' ? 'bg-emerald-400' :
-                          urgent ? 'bg-red-400' : 'bg-amber-400'
-                        }`}
-                      />
-                    ))}
-                    {dayEvents.length > 3 && (
-                      <span className="text-[10px] text-slate-500">+{dayEvents.length - 3}</span>
+                  
+                  <div className="flex flex-col gap-1 w-full overflow-hidden flex-1">
+                    {dayEvents.slice(0, 2).map((e) => {
+                      const urgent = isUrgent(e.date);
+                      return (
+                        <div
+                          key={e.id}
+                          draggable={!e.isProjection}
+                          onDragStart={(ev) => {
+                            ev.dataTransfer.setData('text/plain', e.id);
+                            ev.dataTransfer.effectAllowed = 'move';
+                          }}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            onEventClick?.(e);
+                          }}
+                          className={`
+                            text-[9px] px-1 py-0.5 rounded truncate text-left border select-none transition-all hover:brightness-125
+                            ${e.isProjection 
+                              ? 'bg-indigo-950/30 text-indigo-400 border-indigo-500/10 opacity-70 style-dashed' 
+                              : e.status === 'settled' 
+                                ? 'bg-emerald-950/30 text-emerald-400 border-emerald-500/15' 
+                                : urgent 
+                                  ? 'bg-red-950/30 text-red-400 border-red-500/25 animate-pulse' 
+                                  : 'bg-amber-950/30 text-amber-400 border-amber-500/25'
+                            }
+                          `}
+                          title={`${e.title}: $${e.amount}`}
+                        >
+                          {e.title}
+                        </div>
+                      );
+                    })}
+                    {dayEvents.length > 2 && (
+                      <div className="text-[9px] text-slate-500 pl-1 font-medium">
+                        +{dayEvents.length - 2} más
+                      </div>
                     )}
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>

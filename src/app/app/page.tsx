@@ -211,34 +211,53 @@ function DashboardContent() {
     setIsDrawerOpen(true);
   };
 
-  const handleUpdateTransaction = async (updated: Transaction) => {
+  const handleUpdateTransaction = async (updated: Transaction | Transaction[]) => {
     if (isDemo) {
-      if (updated.id.startsWith('new_')) {
-        const finalTx: Transaction = {
-          ...updated,
-          id: `local_${Date.now()}`,
+      if (Array.isArray(updated)) {
+        const finalTxs = updated.map((tx, idx) => ({
+          ...tx,
+          id: `local_${Date.now()}_${idx}_${Math.random().toString(36).substr(2, 5)}`,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        };
-        updateDemoTransactions([finalTx, ...demoTransactions]);
-        setSelectedTransaction(finalTx);
+        }));
+        updateDemoTransactions([...finalTxs, ...demoTransactions]);
+        if (finalTxs.length > 0) {
+          setSelectedTransaction(finalTxs[0]);
+        }
       } else {
-        const finalTx: Transaction = {
-          ...updated,
-          updated_at: new Date().toISOString(),
-        };
-        updateDemoTransactions(demoTransactions.map(t => t.id === updated.id ? finalTx : t));
-        setSelectedTransaction(finalTx);
+        if (updated.id.startsWith('new_')) {
+          const finalTx: Transaction = {
+            ...updated,
+            id: `local_${Date.now()}`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+          updateDemoTransactions([finalTx, ...demoTransactions]);
+          setSelectedTransaction(finalTx);
+        } else {
+          const finalTx: Transaction = {
+            ...updated,
+            updated_at: new Date().toISOString(),
+          };
+          updateDemoTransactions(demoTransactions.map(t => t.id === updated.id ? finalTx : t));
+          setSelectedTransaction(finalTx);
+        }
       }
       return;
     }
     if (!user) return;
 
-    if (updated.id.startsWith('new_')) {
-      await createTransaction.mutateAsync(mapTransactionToDB(updated, user.id));
+    if (Array.isArray(updated)) {
+      for (const tx of updated) {
+        await createTransaction.mutateAsync(mapTransactionToDB(tx, user.id));
+      }
     } else {
-      await updateTransaction.mutateAsync({ id: updated.id, ...mapTransactionToDB(updated, user.id) });
-      setSelectedTransaction(updated);
+      if (updated.id.startsWith('new_')) {
+        await createTransaction.mutateAsync(mapTransactionToDB(updated, user.id));
+      } else {
+        await updateTransaction.mutateAsync({ id: updated.id, ...mapTransactionToDB(updated, user.id) });
+        setSelectedTransaction(updated);
+      }
     }
   };
 
@@ -290,6 +309,18 @@ function DashboardContent() {
     };
     setSelectedTransaction(newTransaction);
     setIsDrawerOpen(true);
+  };
+
+  const handleEventDrop = async (eventId: string, newDate: string) => {
+    if (eventId.includes('-proj-')) return;
+    const tx = transactions.find(t => t.id === eventId);
+    if (!tx) return;
+    const updated = {
+      ...tx,
+      due_date: newDate,
+      updated_at: new Date().toISOString()
+    };
+    await handleUpdateTransaction(updated);
   };
 
   const handleImport = async (imported: Partial<Transaction>[]) => {
@@ -544,7 +575,7 @@ function DashboardContent() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div>
                     <h3 className="text-xl font-bold text-white mb-4">Calendario</h3>
-                    <CalendarComponent events={calendarEvents} onEventClick={handleEventClick} onDateDoubleClick={handleDateDoubleClick} />
+                    <CalendarComponent events={calendarEvents} onEventClick={handleEventClick} onDateDoubleClick={handleDateDoubleClick} onEventDrop={handleEventDrop} />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-white mb-4">Transacciones Recientes</h3>
@@ -610,7 +641,7 @@ function DashboardContent() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <CalendarComponent events={calendarEvents} onEventClick={handleEventClick} onDateDoubleClick={handleDateDoubleClick} />
+                <CalendarComponent events={calendarEvents} onEventClick={handleEventClick} onDateDoubleClick={handleDateDoubleClick} onEventDrop={handleEventDrop} />
               </motion.div>
             )}
 

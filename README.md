@@ -39,9 +39,10 @@
 
 | Característica | Descripción |
 |----------------|-------------|
-| **Calendario Interactivo** | Visualización del flujo de dinero con recurrencias automáticas |
+| **Calendario Interactivo** | Visualización mensual con drag-and-drop para reprogramar y recurrencias automáticas |
+| **Meses Sin Intereses (MSI)** | Generador automático de mensualidades amortizadas en un solo paso |
 | **Libro Mayor** | Tabla avanzada con filtros por entidad, estado, fecha y monto |
-| **Métricas en Tiempo Real** | Cálculo de Committed vs. Settled cash flow |
+| **Métricas en Tiempo Real** | Cálculo de Committed vs. Settled cash flow y runway de caja |
 | **Seguridad por Entidades** | 7 cuentas segregadas con seguimiento individual |
 | **Drawer de Gestión** | Seguimiento de follow-ups, pagos, adjuntos y cambios de precio |
 
@@ -352,25 +353,27 @@ npm run lint     # Ejecutar linter
 ## 🗺️ Roadmap
 
 ### Fase 1 (Actual)
-- ✅ Dashboard con métricas
-- ✅ Calendario interactivo
-- ✅ Libro mayor con filtros
-- ✅ SideDrawer para gestión
+- ✅ Dashboard con métricas y pronóstico de flujo de caja
+- ✅ Calendario interactivo con vista mensual premium y drag-and-drop de eventos
+- ✅ Libro mayor con filtros, ordenación y exportación de datos
+- ✅ SideDrawer para gestión avanzada
+- ✅ Generador automático de mensualidades a Meses Sin Intereses (MSI)
 
 ### Fase 2
-- [ ] Autenticación de usuarios
-- [ ] Sincronización con Supabase
-- [ ] Subir archivos/PDFs
+- [x] Correcciones de tipado y seguridad de variables de entorno de Supabase en compilaciones estáticas
+- [ ] Autenticación de usuarios completa (Supabase Auth)
+- [ ] Sincronización completa con Supabase Database
+- [ ] Subida de archivos / PDFs a Supabase Storage
 
 ### Fase 3
-- [ ] Integración n8n para automatización
-- [ ] Notificaciones push
-- [ ] Reportes avanzados
+- [ ] Integración n8n para automatización de facturas por email
+- [ ] Notificaciones y recordatorios push/email
+- [ ] Reportes analíticos y gráficos avanzados de runway financiero
 
 ### Fase 4
-- [ ] App móvil (React Native/Expo)
-- [ ] Integración con bancos
-- [ ] IA para predicción de flujo
+- [ ] App móvil multiplataforma (React Native/Expo)
+- [ ] Integración bancaria directa
+- [ ] Modelado de predicción de flujo con Inteligencia Artificial
 
 ---
 

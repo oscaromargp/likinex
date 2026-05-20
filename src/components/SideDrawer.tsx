@@ -3,7 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar, DollarSign, FileText, Clock, CreditCard, Paperclip, Save, Upload, Trash2, Eye, Download, Image as ImageIcon, Edit3, Plus, History } from 'lucide-react';
-import { Transaction, TransactionStatus, PaymentMethod, ENTITY_LABELS, STATUS_LABELS, Currency, CURRENCY_SYMBOLS, convertCurrency, calculatePunctuality, calculateConsecutiveOnTime, getScoreLabel, Attachment, EntityConfig, DEFAULT_ENTITIES, getEntityIcon, getEntityLabel, CATEGORY_LABELS } from '@/types';
+import { Transaction, TransactionStatus, PaymentMethod, ENTITY_LABELS, STATUS_LABELS, Currency, CURRENCY_SYMBOLS, convertCurrency, calculatePunctuality, calculateConsecutiveOnTime, getScoreLabel, Attachment, EntityConfig, DEFAULT_ENTITIES, getEntityIcon, getEntityLabel, CATEGORY_LABELS, Category } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
@@ -20,7 +20,7 @@ interface SideDrawerProps {
   transaction: Transaction | null;
   isOpen: boolean;
   onClose: () => void;
-  onUpdate?: (transaction: Transaction) => void;
+  onUpdate?: (transaction: Transaction | Transaction[]) => void;
   onDelete?: (id: string) => void;
   allTransactions?: Transaction[];
   entities?: EntityConfig[];
@@ -55,7 +55,9 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
     follow_up: '',
     price_change: 0,
     currency: 'MXN' as Currency,
-    displayCurrency: 'MXN' as Currency
+    displayCurrency: 'MXN' as Currency,
+    isMsi: false,
+    msiMonths: 12
   });
   const [attachments, setAttachments] = useState<AttachmentWithPreview[]>([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -83,7 +85,9 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
         follow_up: transaction.follow_up || '',
         price_change: transaction.price_change || 0,
         currency: 'MXN',
-        displayCurrency: 'MXN'
+        displayCurrency: 'MXN',
+        isMsi: false,
+        msiMonths: 12
       });
       setIsEditing(transaction.id.startsWith('new_'));
       setShowDeleteConfirm(false);
@@ -110,6 +114,7 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
   };
 
   const addPaymentRecord = () => {
+    if (!transaction) return;
     if (!newPayment.amount || !newPayment.recipient) return;
     const record: PaymentRecord = {
       id: `pay_${Date.now()}`,
@@ -138,6 +143,7 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
   };
 
   const deletePaymentRecord = (id: string) => {
+    if (!transaction) return;
     const updated = paymentRecords.filter(r => r.id !== id);
     savePaymentRecords(updated);
 
@@ -195,26 +201,55 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
   const handleSave = () => {
     const totalPaid = paymentRecords.reduce((sum, r) => sum + r.amount, 0);
     const isSettled = editForm.amount > 0 ? (totalPaid >= editForm.amount) : (totalPaid > 0);
+    const attachmentUrls = attachments.map(a => a.base64 || a.file_path).join(',');
 
     if (onUpdate) {
-      const attachmentUrls = attachments.map(a => a.base64 || a.file_path).join(',');
-      onUpdate({
-        ...transaction,
-        description: editForm.description,
-        amount: editForm.amount,
-        due_date: editForm.due_date,
-        entity: editForm.entity || transaction.entity,
-        category: editForm.category || undefined,
-        notes: editForm.notes || undefined,
-        payment_method: (editForm.payment_method as PaymentMethod) || undefined,
-        follow_up: editForm.follow_up || undefined,
-        price_change: editForm.price_change || undefined,
-        attachment_url: attachmentUrls || undefined,
-        status: isSettled ? 'settled' : 'pending',
-        paid_date: isSettled 
-          ? (paymentRecords[paymentRecords.length - 1]?.date || new Date().toISOString().split('T')[0]) 
-          : undefined
-      });
+      if (editForm.isMsi && transaction.id.startsWith('new_')) {
+        const msiCount = editForm.msiMonths;
+        const installmentAmount = Math.round((editForm.amount / msiCount) * 100) / 100;
+        const installments: Transaction[] = [];
+        
+        for (let i = 0; i < msiCount; i++) {
+          const installmentDate = new Date(editForm.due_date);
+          installmentDate.setMonth(installmentDate.getMonth() + i);
+          const dateStr = installmentDate.toISOString().split('T')[0];
+          
+          installments.push({
+            ...transaction,
+            id: `new_${Date.now()}_msi_${i}`,
+            description: `${editForm.description} [MSI ${i + 1}/${msiCount}]`,
+            amount: installmentAmount,
+            due_date: dateStr,
+            entity: editForm.entity || transaction.entity,
+            category: (editForm.category as Category) || undefined,
+            notes: editForm.notes || undefined,
+            payment_method: (editForm.payment_method as PaymentMethod) || 'card',
+            follow_up: editForm.follow_up || undefined,
+            price_change: editForm.price_change || undefined,
+            attachment_url: attachmentUrls || undefined,
+            status: 'pending',
+          });
+        }
+        onUpdate(installments);
+      } else {
+        onUpdate({
+          ...transaction,
+          description: editForm.description,
+          amount: editForm.amount,
+          due_date: editForm.due_date,
+          entity: editForm.entity || transaction.entity,
+          category: (editForm.category as Category) || undefined,
+          notes: editForm.notes || undefined,
+          payment_method: (editForm.payment_method as PaymentMethod) || undefined,
+          follow_up: editForm.follow_up || undefined,
+          price_change: editForm.price_change || undefined,
+          attachment_url: attachmentUrls || undefined,
+          status: isSettled ? 'settled' : 'pending',
+          paid_date: isSettled 
+            ? (paymentRecords[paymentRecords.length - 1]?.date || new Date().toISOString().split('T')[0]) 
+            : undefined
+        });
+      }
     }
     setIsEditing(false);
     onClose();
@@ -512,6 +547,46 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                       </>
                     )}
                   </div>
+
+                  {isEditing && transaction.id.startsWith('new_') && (
+                    <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs text-slate-400 mb-1">Diferir a Meses sin Intereses (MSI)</p>
+                          <p className="text-sm font-semibold text-white">¿Es compra a MSI?</p>
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={editForm.isMsi}
+                          onChange={e => setEditForm(f => ({ ...f, isMsi: e.target.checked }))}
+                          className="w-4 h-4 text-emerald-500 bg-slate-700 border-slate-600 rounded focus:ring-emerald-500 focus:ring-2 cursor-pointer animate-pulse"
+                        />
+                      </div>
+                      
+                      {editForm.isMsi && (
+                        <div className="mt-3 flex items-center gap-4 animate-fadeIn">
+                          <div className="flex-1">
+                            <label className="text-xs text-slate-400 block mb-1">Mensualidades</label>
+                            <select
+                              value={editForm.msiMonths}
+                              onChange={e => setEditForm(f => ({ ...f, msiMonths: Number(e.target.value) }))}
+                              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                            >
+                              {[3, 6, 9, 12, 18, 24].map(months => (
+                                <option key={months} value={months}>{months} meses</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <p className="text-xs text-slate-400 block mb-1">Pago mensual estimado</p>
+                            <p className="text-sm font-bold text-emerald-400">
+                              MXN ${editForm.amount > 0 ? (editForm.amount / editForm.msiMonths).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
+                            </p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {transaction.paid_date && !isEditing && (
                     <div className="p-4 bg-slate-800/50 rounded-xl">
