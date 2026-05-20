@@ -53,7 +53,7 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [showProjections, setShowProjections] = useState<boolean>(true);
-  const [monthsAhead, setMonthsAhead] = useState<number>(2);
+  const [monthsAhead, setMonthsAhead] = useState<number>(12);
   const [timeFilter, setTimeFilter] = useState<'all' | 'past' | 'future' | 'today'>('all');
 
   const [sortField, setSortField] = useState<SortField>('due_date');
@@ -327,10 +327,10 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
               className="px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
               title="Meses a proyectar"
             >
-              <option value={1}>1 mes</option>
-              <option value={2}>2 meses</option>
               <option value={3}>3 meses</option>
               <option value={6}>6 meses</option>
+              <option value={12}>12 meses</option>
+              <option value={24}>24 meses</option>
             </select>
           </div>
 

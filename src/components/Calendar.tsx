@@ -59,21 +59,28 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick, onEv
     return year > now.getFullYear() || (year === now.getFullYear() && month > now.getMonth());
   })();
 
+  const totalMonthAmount = monthEvents.reduce((sum, e) => sum + Math.abs(e.amount), 0);
+
   return (
     <div className="bg-slate-900/50 backdrop-blur-xl border border-emerald-500/20 rounded-2xl p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-emerald-500/20 rounded-xl flex items-center justify-center">
             <CalendarIcon className="w-5 h-5 text-emerald-400" />
           </div>
           <div>
             <h2 className="text-xl font-bold text-white">Calendario</h2>
-            {isFutureMonth && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 inline-flex items-center gap-1">
-                <Eye className="w-3 h-3" />
-                Proyección
+            <div className="flex items-center gap-2 mt-0.5">
+              {isFutureMonth && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 inline-flex items-center gap-1">
+                  <Eye className="w-3 h-3" />
+                  Proyeccion
+                </span>
+              )}
+              <span className="text-xs text-slate-500">
+                {monthEvents.length} eventos | {formatCurrency(totalMonthAmount)}
               </span>
-            )}
+            </div>
           </div>
         </div>
         

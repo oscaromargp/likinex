@@ -444,7 +444,7 @@ export const generateCalendarEvents = (transactions: Transaction[]): CalendarEve
     });
 
     if (t.recurrence !== 'none' && t.status === 'pending') {
-      const projections = generateProjections(t, 3);
+      const projections = generateProjections(t, 12);
       projections.forEach((proj, idx) => {
         events.push({
           id: `${t.id}-proj-${idx}`,

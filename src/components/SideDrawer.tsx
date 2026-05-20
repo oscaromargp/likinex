@@ -900,102 +900,54 @@ const handleSave = () => {
                     </div>
                   </div>
 
-                  {/* Contact / Beneficiary Selection */}
-                  <div className="p-4 bg-slate-800/30 border border-slate-800 rounded-2xl space-y-4">
-                    <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold">
-                      <User className="w-4 h-4" />
-                      <span>Beneficiario y Cuenta de Pago</span>
-                    </div>
+                  {/* Contact / Beneficiary Selection - Simplified */}
+                  <div className="p-4 bg-slate-800/30 border border-slate-800 rounded-2xl space-y-3">
+                    <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">Beneficiario / Destino</p>
 
                     {isEditing ? (
                       <div className="space-y-3">
-                        <div>
-                          <label className="text-[10px] text-slate-500 block mb-1">Seleccionar Contacto Guardado</label>
-                          <select
-                            value={editForm.contact_id}
-                            onChange={e => {
-                              const cid = e.target.value;
-                              const contact = contacts.find(c => c.id === cid);
-                              setEditForm(f => ({
-                                ...f,
-                                contact_id: cid,
-                                payment_method: contact?.payment_method_preferred || f.payment_method,
-                                payment_destination: contact ? `${contact.bank_name || ''} - CLABE: ${contact.bank_clabe || contact.bank_account || ''}` : f.payment_destination
-                              }));
-                            }}
-                            className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50"
-                          >
-                            <option value="">Ninguno (Registro manual)</option>
-                            {contacts.map(c => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                          </select>
-                          {selectedContact && (
-                            <div className="flex items-center mt-2 space-x-2">
-                              <div className="w-8 h-8 rounded-full bg-emerald-500/30 flex items-center justify-center text-emerald-400 text-sm font-medium">
-                                {selectedContact.name.split(' ')[0][0]}
-                              </div>
-                              <span className="text-sm text-white">{selectedContact.name}</span>
-                            </div>
-                          )}
-                        </div>
+                        <select
+                          value={editForm.contact_id}
+                          onChange={e => {
+                            const cid = e.target.value;
+                            const contact = contacts.find(c => c.id === cid);
+                            setEditForm(f => ({
+                              ...f,
+                              contact_id: cid,
+                              payment_method: contact?.payment_method_preferred || f.payment_method,
+                              payment_destination: contact ? `${contact.bank_name || ''} - CLABE: ${contact.bank_clabe || contact.bank_account || ''}` : f.payment_destination
+                            }));
+                          }}
+                          className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50"
+                        >
+                          <option value="">Sin contacto (manual)</option>
+                          {contacts.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
                         
-                        <div>
-                          <label className="text-[10px] text-slate-500 block mb-2">Banco Destino</label>
-                          <div className="grid grid-cols-4 gap-2 max-h-[120px] overflow-y-auto pr-1">
-                            {BANKS_CATALOG.map(bank => (
-                              <button
-                                key={bank.id}
-                                onClick={() => setEditForm(f => ({ ...f, bank_id: bank.id, payment_destination: `${bank.name}` }))}
-                                className={cn(
-                                  'p-2 rounded-lg border text-center transition-all hover:scale-105',
-                                  editForm.bank_id === bank.id
-                                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
-                                    : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-slate-600'
-                                )}
-                                title={bank.name}
-                              >
-                                <div className="text-xl mb-0.5">{bank.logo}</div>
-                                <div className="text-[9px] leading-tight">{bank.shortName}</div>
-                              </button>
-                            ))}
-                          </div>
-                          {editForm.bank_id && (
-                            <p className="text-[10px] text-emerald-400 mt-1">
-                              ✓ {BANKS_CATALOG.find(b => b.id === editForm.bank_id)?.name}
-                            </p>
-                          )}
-                        </div>
-
-                        <div>
-                          <label className="text-[10px] text-slate-500 block mb-1">CLABE / Cuenta / Tarjeta</label>
-                          <input
-                            type="text"
-                            placeholder="Ingresa CLABE, número de tarjeta o cuenta"
-                            value={editForm.payment_destination}
-                            onChange={e => setEditForm(f => ({ ...f, payment_destination: e.target.value }))}
-                            className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50 font-mono"
-                          />
-                        </div>
+                        <input
+                          type="text"
+                          placeholder="CLABE, cuenta o tarjeta destino"
+                          value={editForm.payment_destination}
+                          onChange={e => setEditForm(f => ({ ...f, payment_destination: e.target.value }))}
+                          className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50 font-mono"
+                        />
                       </div>
                     ) : (
-                      <div className="space-y-2.5 text-sm">
+                      <div className="space-y-2 text-sm">
                         <div className="flex justify-between items-center">
                           <span className="text-slate-500 text-xs">Beneficiario</span>
-                          <span className="text-white font-semibold">
-                            {selectedContact ? selectedContact.name : 'Ingreso manual'}
+                          <span className="text-white font-semibold text-xs">
+                            {selectedContact ? selectedContact.name : 'Manual'}
                           </span>
                         </div>
-                        <div className="flex justify-between items-start">
-                          <span className="text-slate-500 text-xs mt-0.5">Destino de Pago</span>
-                          <span className="text-white font-mono text-xs text-right max-w-[200px] break-words">
-                            {transaction.payment_destination || 'No especificada'}
-                          </span>
-                        </div>
-                        {selectedContact && (
-                          <div className="pt-2 border-t border-slate-800/80 flex justify-between items-center text-xs">
-                            <span className="text-slate-500">Teléfono</span>
-                            <span className="text-slate-300">{selectedContact.phone || 'No registrado'}</span>
+                        {transaction.payment_destination && (
+                          <div className="flex justify-between items-start">
+                            <span className="text-slate-500 text-xs">Destino</span>
+                            <span className="text-white font-mono text-xs text-right max-w-[180px] break-words">
+                              {transaction.payment_destination}
+                            </span>
                           </div>
                         )}
                       </div>
