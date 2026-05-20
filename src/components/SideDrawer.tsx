@@ -274,6 +274,19 @@ export default function SideDrawer({
     : 0;
 
 const handleSave = () => {
+    if (!editForm.description || editForm.description.trim() === '') {
+      alert('La descripción es obligatoria');
+      return;
+    }
+    if (editForm.amount <= 0) {
+      alert('El monto debe ser mayor a 0');
+      return;
+    }
+    if (!editForm.entity) {
+      alert('Selecciona una entidad');
+      return;
+    }
+
     const totalPaid = paymentRecords.reduce((sum, r) => sum + r.amount, 0);
     const absAmount = Math.abs(editForm.amount);
     const isIncome = editForm.type === 'income';
@@ -329,12 +342,6 @@ const handleSave = () => {
         }
         onUpdate(installments);
       } else if (hasDateChanged && isRecurring && !transaction.id.startsWith('new_')) {
-        const futureCount = countFutureOccurrences(transaction, allTransactions, editForm.due_date);
-        if (futureCount > 0) {
-          setPendingDateChange({ newDate: editForm.due_date, originalDate });
-          setShowRecurrenceModal(true);
-          return;
-        }
         performUpdate(editForm.due_date, 'single', attachmentUrls, calculatedStatus, isIncome);
       } else {
         performUpdate(editForm.due_date, 'single', attachmentUrls, calculatedStatus, isIncome);
@@ -455,7 +462,7 @@ const handleSave = () => {
     if (!pendingDateChange) return;
     const totalPaid = paymentRecords.reduce((sum, r) => sum + r.amount, 0);
     const absAmount = Math.abs(editForm.amount);
-    const isIncome = editForm.amount < 0;
+    const isIncome = editForm.type === 'income';
     
     let calculatedStatus: TransactionStatus = 'pending';
     if (isIncome) {
@@ -477,7 +484,7 @@ const handleSave = () => {
     if (!pendingDateChange) return;
     const totalPaid = paymentRecords.reduce((sum, r) => sum + r.amount, 0);
     const absAmount = Math.abs(editForm.amount);
-    const isIncome = editForm.amount < 0;
+    const isIncome = editForm.type === 'income';
     
     let calculatedStatus: TransactionStatus = 'pending';
     if (isIncome) {
@@ -719,7 +726,12 @@ const handleSave = () => {
                           onChange={e => setEditForm(f => ({ ...f, entity: e.target.value }))}
                           className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
                         >
-                          {entities.map(ent => (
+                          {DEFAULT_ENTITIES.map(ent => (
+                            <option key={ent.id} value={ent.id} className="bg-slate-900 text-white">
+                              {ent.icon} {ent.name}
+                            </option>
+                          ))}
+                          {entities.filter(e => !DEFAULT_ENTITIES.find(de => de.id === e.id)).map(ent => (
                             <option key={ent.id} value={ent.id} className="bg-slate-900 text-white">
                               {ent.icon} {ent.name}
                             </option>
@@ -979,7 +991,7 @@ const handleSave = () => {
 
                     {isEditing ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-lg font-bold text-emerald-400">MXN $</span>
+                        <span className="text-lg font-bold text-emerald-400">{CURRENCY_SYMBOLS[editForm.currency || 'MXN']}</span>
                         <input
                           type="number"
                           step="0.01"

@@ -17,6 +17,8 @@ import {
   CATEGORY_LABELS as CATEGORIES,
   RecurrenceType,
   EntityConfig,
+  getEntityLabel,
+  getEntityColor,
   calculatePunctuality, 
   calculateConsecutiveOnTime 
 } from '@/types';
@@ -508,7 +510,9 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
                 : 0;
               const categoryLabel = transaction.category && CATEGORY_LABELS[transaction.category as keyof typeof CATEGORY_LABELS] 
                 ? CATEGORY_LABELS[transaction.category as keyof typeof CATEGORY_LABELS]
-                : '-';
+                : (transaction.category || '-');
+              const entityLabel = getEntityLabel(transaction.entity, entities);
+              const entityColor = getEntityColor(transaction.entity, entities);
               
               return (
                 <motion.tr
@@ -546,8 +550,8 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
                     </div>
                   </td>
                   <td className="p-4">
-                    <span className={cn('text-xs px-2 py-1 rounded-full', ENTITY_COLORS[transaction.entity])}>
-                      {ENTITY_LABELS[transaction.entity]}
+                    <span className={cn('text-xs px-2 py-1 rounded-full', entityColor)}>
+                      {entityLabel}
                     </span>
                   </td>
                   <td className="p-4">

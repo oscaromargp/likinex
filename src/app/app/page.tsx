@@ -394,11 +394,14 @@ function DashboardContent() {
     const newTransaction: Transaction = {
       id: `new_${Date.now()}`,
       entity: entities[0]?.id || 'oscaromargp',
-      description: 'Nueva transacción',
+      description: '',
       amount: 0,
       due_date: todayStr,
       status: 'pending',
+      type: 'expense',
       recurrence: 'none',
+      tolerance_days: 2,
+      payment_method: 'transfer',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -410,11 +413,14 @@ function DashboardContent() {
     const newTransaction: Transaction = {
       id: `new_${Date.now()}`,
       entity: entities[0]?.id || 'oscaromargp',
-      description: 'Nueva transacción',
+      description: '',
       amount: 0,
       due_date: date,
       status: 'pending',
+      type: 'expense',
       recurrence: 'none',
+      tolerance_days: 2,
+      payment_method: 'transfer',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
