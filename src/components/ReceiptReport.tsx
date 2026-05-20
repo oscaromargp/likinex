@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Transaction, Contact, ENTITY_LABELS, STATUS_LABELS, CATEGORY_LABELS, generateCEP, isIncomeTransaction, PaymentReceipt } from '@/types';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { ShieldCheck, Download, Printer, X, Landmark, FileText, CheckCircle2 } from 'lucide-react';
+import { Icon } from '@iconify/react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ReceiptReportProps {
@@ -75,21 +76,40 @@ export default function ReceiptReport({ transaction, contact, receipts = [], onC
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           className="relative w-full max-w-[210mm] max-h-[90vh] overflow-y-auto custom-scrollbar rounded-2xl shadow-2xl bg-white print:h-auto print:max-h-none print:overflow-visible"
         >
-          {/* Header de controles (No imprimible) */}
-          <div className="no-print sticky top-0 z-10 bg-slate-900 px-6 py-4 flex justify-between items-center border-b border-slate-800">
-            <h3 className="text-white font-semibold flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              Comprobante Seguro
-            </h3>
-            <div className="flex gap-2">
-              <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors">
-                <Printer className="w-4 h-4" /> Imprimir / PDF
-              </button>
-              <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+            {/* Header de controles (No imprimible) */}
+            <div className="no-print sticky top-0 z-10 bg-slate-900 px-6 py-4 flex justify-between items-center border-b border-slate-800">
+              <h3 className="text-white font-semibold flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-400" />
+                Comprobante Seguro
+              </h3>
+              <div className="flex gap-2">
+                {contact && contact.phones && contact.phones.length > 0 && (
+                  <button 
+                    onClick={() => {
+                      const phone = contact.phones![0].number.replace(/\D/g, '');
+                      const message = encodeURIComponent(
+                        `✅ *Pago Confirmado - LikinEX*\n\n` +
+                        `📋 *Concepto:* ${transaction.description}\n` +
+                        `💰 *Monto:* ${formatCurrency(Math.abs(transaction.amount))} MXN\n` +
+                        `📅 *Fecha:* ${formatDate(transaction.paid_date || transaction.due_date)}\n` +
+                        `🔖 *Folio:* ${cep}\n\n` +
+                        `_Comprobante generado automáticamente por LikinEX_`
+                      );
+                      window.open(`https://wa.me/52${phone}?text=${message}`, '_blank');
+                    }} 
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <Icon icon="mdi:whatsapp" className="w-5 h-5" /> Enviar por WhatsApp
+                  </button>
+                )}
+                <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors">
+                  <Printer className="w-4 h-4" /> Imprimir / PDF
+                </button>
+                <button onClick={onClose} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
-          </div>
 
           {/* Contenido Imprimible */}
           <div id="receipt-content" className="bg-white text-slate-900 p-8 sm:p-12 relative overflow-hidden">

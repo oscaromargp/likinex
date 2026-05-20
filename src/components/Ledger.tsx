@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Search, Filter, ArrowUpDown, ChevronDown, ChevronUp, Printer, Paperclip, Eye, EyeOff, Calendar } from 'lucide-react';
+import { Icon } from '@iconify/react';
 import { 
   Transaction, 
   Entity, 
@@ -53,6 +54,7 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
   const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
   const [showProjections, setShowProjections] = useState<boolean>(true);
   const [monthsAhead, setMonthsAhead] = useState<number>(2);
+  const [timeFilter, setTimeFilter] = useState<'all' | 'past' | 'future' | 'today'>('all');
 
   const [sortField, setSortField] = useState<SortField>('due_date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -139,6 +141,17 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
 
   const filteredAndSorted = useMemo(() => {
     let result = [...allTxs];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (timeFilter === 'past') {
+      result = result.filter(t => new Date(t.due_date) < today && !t.isProjection);
+    } else if (timeFilter === 'future') {
+      result = result.filter(t => new Date(t.due_date) >= today);
+    } else if (timeFilter === 'today') {
+      const todayStr = today.toISOString().split('T')[0];
+      result = result.filter(t => t.due_date === todayStr);
+    }
 
     if (filters.search) {
       const search = filters.search.toLowerCase();
@@ -189,7 +202,7 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
     });
 
     return result;
-  }, [allTxs, filters, categoryFilter, typeFilter, sortField, sortDirection, printDateFrom, printDateTo]);
+  }, [allTxs, filters, categoryFilter, typeFilter, timeFilter, sortField, sortDirection, printDateFrom, printDateTo]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -322,6 +335,58 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
           </div>
 
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Filtros rápidos de tiempo */}
+            <div className="flex items-center gap-1 bg-slate-800/50 rounded-lg p-1">
+              <button
+                onClick={() => setTimeFilter('all')}
+                className={cn(
+                  'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                  timeFilter === 'all' 
+                    ? 'bg-emerald-500/20 text-emerald-400' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                )}
+              >
+                <Icon icon="mdi:calendar-multiple" className="w-3.5 h-3.5 inline mr-1" />
+                Todas
+              </button>
+              <button
+                onClick={() => setTimeFilter('past')}
+                className={cn(
+                  'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                  timeFilter === 'past' 
+                    ? 'bg-amber-500/20 text-amber-400' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                )}
+              >
+                <Icon icon="mdi:history" className="w-3.5 h-3.5 inline mr-1" />
+                Pasadas
+              </button>
+              <button
+                onClick={() => setTimeFilter('today')}
+                className={cn(
+                  'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                  timeFilter === 'today' 
+                    ? 'bg-blue-500/20 text-blue-400' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                )}
+              >
+                <Icon icon="mdi:calendar-today" className="w-3.5 h-3.5 inline mr-1" />
+                Hoy
+              </button>
+              <button
+                onClick={() => setTimeFilter('future')}
+                className={cn(
+                  'px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                  timeFilter === 'future' 
+                    ? 'bg-indigo-500/20 text-indigo-400' 
+                    : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                )}
+              >
+                <Icon icon="mdi:calendar-arrow-right" className="w-3.5 h-3.5 inline mr-1" />
+                Futuras
+              </button>
+            </div>
+
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-slate-500" />
               <span className="text-sm text-slate-400">Rango de fechas:</span>

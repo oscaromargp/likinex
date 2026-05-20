@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Plus, Phone, MapPin, CreditCard, Copy, Check, Edit2, Trash2, X, Globe, User, Landmark, FileText, Printer, History, AlertTriangle, ShieldCheck, Mail, Link as LinkIcon, Building2 } from 'lucide-react';
+import { Icon } from '@iconify/react';
 import { Contact, PaymentMethod, Transaction, generateCEP, isIncomeTransaction, BankAccount, PhoneNumber, Address, ReputationNote } from '@/types';
 import { cn, formatCurrency, formatDate } from '@/lib/utils';
 import ReceiptReport from './ReceiptReport';
@@ -239,27 +240,27 @@ export default function Contacts({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 className={cn(
-                  "bg-slate-900/40 backdrop-blur-xl border rounded-2xl transition-all flex flex-col",
-                  isExpanded ? "border-emerald-500/30 shadow-lg shadow-emerald-500/5 col-span-full md:col-span-2 lg:col-span-3" : "border-slate-800/80 hover:border-slate-700/50"
+                  "bg-slate-900/40 backdrop-blur-xl border rounded-2xl transition-all flex flex-col overflow-hidden",
+                  isExpanded ? "border-emerald-500/30 shadow-lg shadow-emerald-500/5" : "border-slate-800/80 hover:border-slate-700/50"
                 )}
               >
                 {/* Header (Always Visible) */}
                 <div className="p-5 flex flex-col sm:flex-row justify-between items-start gap-4">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl flex items-center justify-center text-emerald-400 font-bold text-xl border border-slate-700/50 shadow-inner">
+                  <div className="flex items-center gap-4 min-w-0 flex-1">
+                    <div className="w-12 h-12 flex-shrink-0 bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl flex items-center justify-center text-emerald-400 font-bold text-xl border border-slate-700/50 shadow-inner">
                       {c.name.charAt(0).toUpperCase()}
                     </div>
-                    <div>
+                    <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="text-white font-semibold text-base leading-tight">{c.name}</h3>
+                        <h3 className="text-white font-semibold text-base leading-tight truncate">{c.name}</h3>
                         {negativeReps > 0 && (
-                          <span className="flex items-center gap-1 text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-medium" title="Tiene reportes negativos">
+                          <span className="flex-shrink-0 flex items-center gap-1 text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-medium" title="Tiene reportes negativos">
                             <AlertTriangle className="w-3 h-3" />
                             Atención
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 mt-1.5 text-xs text-slate-400">
+                      <div className="flex flex-wrap items-center gap-3 mt-1.5 text-xs text-slate-400">
                         {allPhones[0] && (
                           <span className="flex items-center gap-1.5">
                             <Phone className="w-3.5 h-3.5 text-emerald-500/70" />
@@ -267,7 +268,7 @@ export default function Contacts({
                           </span>
                         )}
                         {c.email && (
-                          <span className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-1.5 truncate">
                             <Mail className="w-3.5 h-3.5 text-blue-500/70" />
                             {c.email}
                           </span>
@@ -276,7 +277,7 @@ export default function Contacts({
                     </div>
                   </div>
                   
-                  <div className="flex gap-2 w-full sm:w-auto justify-end">
+                  <div className="flex gap-2 w-full sm:w-auto justify-end flex-shrink-0">
                     {onCreateTransactionForContact && (
                       <button
                         onClick={(e) => { e.stopPropagation(); onCreateTransactionForContact(c); }}
@@ -292,7 +293,7 @@ export default function Contacts({
                         isExpanded ? "bg-slate-800 border-slate-700 text-white" : "bg-transparent border-slate-700 text-slate-400 hover:text-white hover:bg-slate-800"
                       )}
                     >
-                      {isExpanded ? 'Ocultar Detalle' : 'Ver Detalle'}
+                      {isExpanded ? 'Ocultar' : 'Ver Detalle'}
                     </button>
                   </div>
                 </div>
@@ -348,10 +349,10 @@ export default function Contacts({
                         </div>
 
                         {/* Tab Content */}
-                        <div className="flex-1 bg-slate-900/50 rounded-xl p-6 border border-slate-800/50 min-h-[300px]">
+                        <div className="flex-1 bg-slate-900/50 rounded-xl p-6 border border-slate-800/50 min-h-[300px] overflow-hidden">
                           {activeTab === 'info' && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                              <div className="space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              <div className="space-y-5">
                                 <div>
                                   <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
                                     <Phone className="w-4 h-4 text-emerald-500" /> Teléfonos
@@ -360,11 +361,11 @@ export default function Contacts({
                                     {allPhones.length === 0 ? <p className="text-xs text-slate-500">No hay teléfonos registrados</p> : null}
                                     {allPhones.map((p, i) => (
                                       <div key={i} className="flex justify-between items-center bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/60">
-                                        <div className="flex flex-col">
-                                          <span className="text-white text-sm font-medium">{p.number}</span>
-                                          <span className="text-[10px] text-slate-500 uppercase tracking-wider">{p.type} {p.description ? `- ${p.description}` : ''}</span>
+                                        <div className="flex flex-col min-w-0 flex-1">
+                                          <span className="text-white text-sm font-medium truncate">{p.number}</span>
+                                          <span className="text-[10px] text-slate-500 uppercase tracking-wider truncate">{p.type} {p.description ? `- ${p.description}` : ''}</span>
                                         </div>
-                                        <button onClick={() => handleCopy(p.number, `p-${i}`)} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded">
+                                        <button onClick={() => handleCopy(p.number, `p-${i}`)} className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded flex-shrink-0">
                                           {copiedId === `p-${i}` ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                                         </button>
                                       </div>
@@ -381,14 +382,14 @@ export default function Contacts({
                                     {allAddrs.map((a, i) => (
                                       <div key={i} className="flex flex-col gap-1 bg-slate-950/40 p-3 rounded-lg border border-slate-800/60">
                                         <span className="text-[10px] text-emerald-500/70 uppercase tracking-wider font-semibold">{a.type}</span>
-                                        <span className="text-white text-sm leading-relaxed">{a.address}</span>
+                                        <span className="text-white text-sm leading-relaxed break-words">{a.address}</span>
                                       </div>
                                     ))}
                                   </div>
                                 </div>
                               </div>
                               
-                              <div className="space-y-6">
+                              <div className="space-y-5">
                                 <div>
                                   <h4 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
                                     <Globe className="w-4 h-4 text-blue-500" /> Presencia Digital
@@ -396,18 +397,18 @@ export default function Contacts({
                                   <div className="space-y-2">
                                     {(!c.digital_presence?.website && !c.digital_presence?.facebook && !c.email) && <p className="text-xs text-slate-500">Sin datos digitales</p>}
                                     {c.email && (
-                                      <a href={`mailto:${c.email}`} className="flex items-center gap-3 text-sm text-slate-300 hover:text-white bg-slate-950/30 p-2 rounded-lg transition-colors">
-                                        <Mail className="w-4 h-4 text-slate-400" /> {c.email}
+                                      <a href={`mailto:${c.email}`} className="flex items-center gap-3 text-sm text-slate-300 hover:text-white bg-slate-950/30 p-2 rounded-lg transition-colors truncate">
+                                        <Mail className="w-4 h-4 text-slate-400 flex-shrink-0" /> <span className="truncate">{c.email}</span>
                                       </a>
                                     )}
                                     {c.digital_presence?.website && (
-                                      <a href={c.digital_presence.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-sm text-slate-300 hover:text-blue-400 bg-slate-950/30 p-2 rounded-lg transition-colors">
-                                        <LinkIcon className="w-4 h-4" /> {c.digital_presence.website}
+                                      <a href={c.digital_presence.website} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-sm text-slate-300 hover:text-blue-400 bg-slate-950/30 p-2 rounded-lg transition-colors truncate">
+                                        <LinkIcon className="w-4 h-4 flex-shrink-0" /> <span className="truncate">{c.digital_presence.website}</span>
                                       </a>
                                     )}
                                     {c.digital_presence?.facebook && (
                                       <a href={c.digital_presence.facebook} target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 text-sm text-slate-300 hover:text-blue-500 bg-slate-950/30 p-2 rounded-lg transition-colors">
-                                        <Globe className="w-4 h-4" /> Facebook
+                                        <Globe className="w-4 h-4 flex-shrink-0" /> Facebook
                                       </a>
                                     )}
                                   </div>
@@ -416,7 +417,7 @@ export default function Contacts({
                                 {c.notes && (
                                   <div>
                                     <h4 className="text-sm font-semibold text-slate-300 mb-2">Notas Generales</h4>
-                                    <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/50 text-sm text-slate-300 italic">
+                                    <div className="bg-slate-800/30 p-3 rounded-lg border border-slate-700/50 text-sm text-slate-300 italic break-words">
                                       "{c.notes}"
                                     </div>
                                   </div>
@@ -442,22 +443,22 @@ export default function Contacts({
                                         </div>
                                       )}
                                       <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 border border-slate-700">
+                                        <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-300 border border-slate-700 flex-shrink-0">
                                           <Building2 className="w-4 h-4" />
                                         </div>
-                                        <div>
-                                          <h5 className="text-white font-medium text-sm">{b.bank_name || 'Banco Desconocido'}</h5>
-                                          {b.alias && <p className="text-[10px] text-slate-500">{b.alias}</p>}
+                                        <div className="min-w-0 flex-1">
+                                          <h5 className="text-white font-medium text-sm truncate">{b.bank_name || 'Banco Desconocido'}</h5>
+                                          {b.alias && <p className="text-[10px] text-slate-500 truncate">{b.alias}</p>}
                                         </div>
                                       </div>
                                       
                                       <div className="space-y-2">
                                         {b.account_number && (
                                           <div className="flex justify-between items-center bg-slate-900 p-2 rounded-lg border border-slate-800/50">
-                                            <span className="text-[11px] text-slate-500 font-medium">CUENTA</span>
-                                            <div className="flex items-center gap-2">
-                                              <span className="text-white font-mono text-sm tracking-wide">{b.account_number}</span>
-                                              <button onClick={() => handleCopy(b.account_number!, `b-acc-${i}`)} className="text-slate-500 hover:text-emerald-400 transition-colors">
+                                            <span className="text-[11px] text-slate-500 font-medium flex-shrink-0">CUENTA</span>
+                                            <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                                              <span className="text-white font-mono text-sm tracking-wide truncate max-w-[120px]">{b.account_number}</span>
+                                              <button onClick={() => handleCopy(b.account_number!, `b-acc-${i}`)} className="text-slate-500 hover:text-emerald-400 transition-colors flex-shrink-0">
                                                 {copiedId === `b-acc-${i}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                                               </button>
                                             </div>
@@ -465,10 +466,10 @@ export default function Contacts({
                                         )}
                                         {b.clabe && (
                                           <div className="flex justify-between items-center bg-slate-900 p-2 rounded-lg border border-slate-800/50">
-                                            <span className="text-[11px] text-slate-500 font-medium">CLABE</span>
-                                            <div className="flex items-center gap-2">
-                                              <span className="text-white font-mono text-sm tracking-wide">{b.clabe}</span>
-                                              <button onClick={() => handleCopy(b.clabe!, `b-clb-${i}`)} className="text-slate-500 hover:text-emerald-400 transition-colors">
+                                            <span className="text-[11px] text-slate-500 font-medium flex-shrink-0">CLABE</span>
+                                            <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                                              <span className="text-white font-mono text-sm tracking-wide truncate max-w-[120px]">{b.clabe}</span>
+                                              <button onClick={() => handleCopy(b.clabe!, `b-clb-${i}`)} className="text-slate-500 hover:text-emerald-400 transition-colors flex-shrink-0">
                                                 {copiedId === `b-clb-${i}` ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                                               </button>
                                             </div>
@@ -542,14 +543,37 @@ export default function Contacts({
                                             )}>{tx.status}</span>
                                             <span>{formatDate(tx.paid_date || tx.due_date)}</span>
                                           </div>
-                                          {tx.status === 'settled' && (
-                                            <button
-                                              onClick={() => setShowReceipt({ tx, contact: c })}
-                                              className="flex items-center gap-1 text-[10px] text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-1 rounded"
-                                            >
-                                              <FileText className="w-3 h-3" /> Ver Comprobante
-                                            </button>
-                                          )}
+                                          <div className="flex gap-1.5">
+                                            {tx.status === 'settled' && c.phones && c.phones.length > 0 && (
+                                              <button
+                                                onClick={() => {
+                                                  const phone = c.phones![0].number.replace(/\D/g, '');
+                                                  const cep = generateCEP(tx.id, c.id);
+                                                  const message = encodeURIComponent(
+                                                    `✅ *Pago Confirmado - LikinEX*\n\n` +
+                                                    `📋 *Concepto:* ${tx.description}\n` +
+                                                    `💰 *Monto:* ${formatCurrency(Math.abs(tx.amount))} MXN\n` +
+                                                    `📅 *Fecha:* ${formatDate(tx.paid_date || tx.due_date)}\n` +
+                                                    `🔖 *Folio:* ${cep}\n\n` +
+                                                    `_Comprobante generado automáticamente por LikinEX_`
+                                                  );
+                                                  window.open(`https://wa.me/52${phone}?text=${message}`, '_blank');
+                                                }}
+                                                className="flex items-center gap-1 text-[10px] text-green-400 hover:text-green-300 bg-green-500/10 hover:bg-green-500/20 px-2 py-1 rounded"
+                                                title="Enviar comprobante por WhatsApp"
+                                              >
+                                                <Icon icon="mdi:whatsapp" className="w-3 h-3" /> Enviar
+                                              </button>
+                                            )}
+                                            {tx.status === 'settled' && (
+                                              <button
+                                                onClick={() => setShowReceipt({ tx, contact: c })}
+                                                className="flex items-center gap-1 text-[10px] text-indigo-400 hover:text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20 px-2 py-1 rounded"
+                                              >
+                                                <FileText className="w-3 h-3" /> Ver
+                                              </button>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     ))

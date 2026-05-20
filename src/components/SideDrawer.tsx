@@ -82,6 +82,7 @@ export default function SideDrawer({
   const [activeTab, setActiveTab] = useState<'details' | 'execution'>('details');
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [newCategory, setNewCategory] = useState<string | undefined>(undefined);
   const [editForm, setEditForm] = useState({
     description: '',
     amount: 0,
@@ -739,31 +740,66 @@ const handleSave = () => {
                     <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
                       <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Categoría</p>
                       {isEditing ? (
-                        <select
-                          value={editForm.category}
-                          onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
-                          className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
-                        >
-                          <option value="otro" className="bg-slate-900 text-white">Otro</option>
-                          {categories.length > 0 ? (
-                            categories.map(cat => (
-                              <option key={cat} value={cat} className="bg-slate-900 text-white">
-                                {cat}
-                              </option>
-                            ))
-                          ) : (
-                            Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                              key !== 'otro' && (
-                                <option key={key} value={key} className="bg-slate-900 text-white">
-                                  {label}
-                                </option>
-                              )
-                            ))
+                        <div className="flex flex-col space-y-1">
+                          <select
+                            value={editForm.category || '__default__'}
+                            onChange={e => {
+                              if (e.target.value === '__new__') {
+                                setNewCategory('');
+                                setEditForm(f => ({ ...f, category: '' }));
+                              } else if (e.target.value === '__default__') {
+                                setEditForm(f => ({ ...f, category: '' }));
+                              } else {
+                                setEditForm(f => ({ ...f, category: e.target.value }));
+                              }
+                            }}
+                            className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
+                          >
+                            <option value="__default__" className="bg-slate-900 text-white">Seleccionar categoría...</option>
+                            {categories.map(cat => (
+                              <option key={cat} value={cat} className="bg-slate-900 text-white">{CATEGORY_LABELS[cat as keyof typeof CATEGORY_LABELS] || cat}</option>
+                            ))}
+                            {Object.entries(CATEGORY_LABELS)
+                              .filter(([key]) => !categories.includes(key) && key !== 'otro')
+                              .map(([key, label]) => (
+                                <option key={key} value={key} className="bg-slate-900 text-white">{label}</option>
+                              ))}
+                            <option value="otro" className="bg-slate-900 text-white">Otro</option>
+                            <option value="__new__" className="bg-slate-900 text-emerald-400">+ Añadir nueva</option>
+                          </select>
+                          {newCategory !== undefined && newCategory === '' && (
+                            <div className="flex items-center space-x-2 mt-1">
+                              <input
+                                type="text"
+                                placeholder="Nueva categoría"
+                                value={newCategory}
+                                onChange={e => setNewCategory(e.target.value)}
+                                className="flex-1 bg-slate-800 border border-slate-600 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-emerald-500"
+                                autoFocus
+                              />
+                              <button
+                                onClick={() => {
+                                  if (newCategory.trim()) {
+                                    setEditForm(f => ({ ...f, category: newCategory.trim() }));
+                                    setNewCategory(undefined);
+                                  }
+                                }}
+                                className="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-xs text-white rounded"
+                              >
+                                ✔
+                              </button>
+                              <button
+                                onClick={() => setNewCategory(undefined)}
+                                className="px-2 py-1 bg-slate-700 hover:bg-slate-600 text-xs text-white rounded"
+                              >
+                                ✕
+                              </button>
+                            </div>
                           )}
-                        </select>
+                        </div>
                       ) : (
                         <p className="text-white text-sm font-medium">
-                          {editForm.category || CATEGORY_LABELS[transaction.category as keyof typeof CATEGORY_LABELS] || transaction.category || 'Otro'}
+                          {CATEGORY_LABELS[transaction.category as keyof typeof CATEGORY_LABELS] || transaction.category || 'Sin categoría'}
                         </p>
                       )}
                     </div>
@@ -894,6 +930,14 @@ const handleSave = () => {
                               <option key={c.id} value={c.id}>{c.name}</option>
                             ))}
                           </select>
+                          {selectedContact && (
+                            <div className="flex items-center mt-2 space-x-2">
+                              <div className="w-8 h-8 rounded-full bg-emerald-500/30 flex items-center justify-center text-emerald-400 text-sm font-medium">
+                                {selectedContact.name.split(' ')[0][0]}
+                              </div>
+                              <span className="text-sm text-white">{selectedContact.name}</span>
+                            </div>
+                          )}
                         </div>
                         
                         <div>
@@ -1053,18 +1097,21 @@ const handleSave = () => {
                       <div>
                         <label className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block mb-1">Método de Pago</label>
                         {isEditing ? (
-                          <select
-                            value={editForm.payment_method}
-                            onChange={e => setEditForm(f => ({ ...f, payment_method: e.target.value }))}
-                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
-                          >
-                            <option value="">Seleccionar...</option>
-                            <option value="transfer">Transferencia</option>
-                            <option value="cash">Efectivo</option>
-                            <option value="card">Tarjeta</option>
-                            <option value="check">Cheque</option>
-                            <option value="other">Otro</option>
-                          </select>
+                          <>
+                            <select
+                              value={editForm.payment_method}
+                              onChange={e => setEditForm(f => ({ ...f, payment_method: e.target.value }))}
+                              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                            >
+                              <option value="">Seleccionar metodo...</option>
+                              <option value="transfer">Transferencia</option>
+                              <option value="cash">Efectivo</option>
+                              <option value="card">Tarjeta</option>
+                              <option value="check">Cheque</option>
+                              <option value="other">Otro</option>
+                            </select>
+                            <p className="text-xs text-slate-500 mt-1">Metodo de pago usado para la operacion. Si no es relevante, puedes dejarlo en &quot;Otro&quot;.</p>
+                          </>
                         ) : (
                           <p className="text-white text-xs font-semibold">
                             {PAYMENT_METHODS.find(m => m.value === transaction.payment_method)?.icon || '📦'} {PAYMENT_METHODS.find(m => m.value === transaction.payment_method)?.label || 'Otro'}
@@ -1075,12 +1122,15 @@ const handleSave = () => {
                       <div>
                         <label className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block mb-1">Seguimiento</label>
                         {isEditing ? (
-                          <input
-                            type="datetime-local"
-                            value={editForm.follow_up}
-                            onChange={e => setEditForm(f => ({ ...f, follow_up: e.target.value }))}
-                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none"
-                          />
+                          <>
+                            <input
+                              type="datetime-local"
+                              value={editForm.follow_up}
+                              onChange={e => setEditForm(f => ({ ...f, follow_up: e.target.value }))}
+                              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">Recordatorio opcional para seguir la operacion (ej. llamada de confirmacion).</p>
+                          </>
                         ) : (
                           <p className="text-white text-xs font-medium">
                             {transaction.follow_up ? formatDate(transaction.follow_up) : 'Sin recordatorio'}
