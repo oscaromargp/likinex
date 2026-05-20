@@ -332,7 +332,8 @@ Content-Type: application/json
 ### Estados
 
 - **pending** - Pendiente de pago
-- **settled** - Liquidado/completado
+- **partial** - Liquidado de forma parcial (con abonos)
+- **settled** - Liquidado/completado en su totalidad
 - **cancelled** - Cancelado
 
 ---
@@ -356,11 +357,14 @@ npm run lint     # Ejecutar linter
 - ✅ Dashboard con métricas y pronóstico de flujo de caja
 - ✅ Calendario interactivo con vista mensual premium y drag-and-drop de eventos
 - ✅ Libro mayor con filtros, ordenación y exportación de datos
-- ✅ SideDrawer para gestión avanzada
+- ✅ SideDrawer unificado y simplificado para gestión avanzada (Detalles vs Ejecución)
+- ✅ Módulo de Contactos y Directorio con copiado rápido de cuentas bancarias y CLABE
+- ✅ Estatus de Pago Parcial automático al añadir abonos/parcialidades a una operación
 - ✅ Generador automático de mensualidades a Meses Sin Intereses (MSI)
 
 ### Fase 2
 - [x] Correcciones de tipado y seguridad de variables de entorno de Supabase en compilaciones estáticas
+- [x] Módulo integrado de directorio de beneficiarios/contactos y pre-llenado de cuentas
 - [ ] Autenticación de usuarios completa (Supabase Auth)
 - [ ] Sincronización completa con Supabase Database
 - [ ] Subida de archivos / PDFs a Supabase Storage
