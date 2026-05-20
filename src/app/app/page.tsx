@@ -221,12 +221,14 @@ function DashboardContent() {
           updated_at: new Date().toISOString(),
         };
         updateDemoTransactions([finalTx, ...demoTransactions]);
+        setSelectedTransaction(finalTx);
       } else {
         const finalTx: Transaction = {
           ...updated,
           updated_at: new Date().toISOString(),
         };
         updateDemoTransactions(demoTransactions.map(t => t.id === updated.id ? finalTx : t));
+        setSelectedTransaction(finalTx);
       }
       return;
     }
@@ -236,6 +238,7 @@ function DashboardContent() {
       await createTransaction.mutateAsync(mapTransactionToDB(updated, user.id));
     } else {
       await updateTransaction.mutateAsync({ id: updated.id, ...mapTransactionToDB(updated, user.id) });
+      setSelectedTransaction(updated);
     }
   };
 

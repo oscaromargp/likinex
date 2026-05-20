@@ -121,12 +121,39 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
     };
     const updated = [...paymentRecords, record];
     savePaymentRecords(updated);
+
+    // Auto-settle logic
+    const totalPaid = updated.reduce((sum, r) => sum + r.amount, 0);
+    const isSettled = transaction.amount > 0 ? (totalPaid >= transaction.amount) : (totalPaid > 0);
+
+    if (onUpdate) {
+      onUpdate({
+        ...transaction,
+        status: isSettled ? 'settled' : 'pending',
+        paid_date: isSettled ? record.date : undefined
+      });
+    }
+
     setNewPayment({ amount: 0, method: 'transfer', recipient: '', date: new Date().toISOString().split('T')[0], notes: '' });
   };
 
   const deletePaymentRecord = (id: string) => {
     const updated = paymentRecords.filter(r => r.id !== id);
     savePaymentRecords(updated);
+
+    // Auto-settle logic
+    const totalPaid = updated.reduce((sum, r) => sum + r.amount, 0);
+    const isSettled = transaction.amount > 0 ? (totalPaid >= transaction.amount) : (totalPaid > 0);
+
+    if (onUpdate) {
+      onUpdate({
+        ...transaction,
+        status: isSettled ? 'settled' : 'pending',
+        paid_date: isSettled 
+          ? (updated[updated.length - 1]?.date || new Date().toISOString().split('T')[0]) 
+          : undefined
+      });
+    }
   };
 
   const convertAndDisplay = (amount: number, from: Currency, to: Currency) => {
@@ -166,6 +193,9 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
     : 0;
 
   const handleSave = () => {
+    const totalPaid = paymentRecords.reduce((sum, r) => sum + r.amount, 0);
+    const isSettled = editForm.amount > 0 ? (totalPaid >= editForm.amount) : (totalPaid > 0);
+
     if (onUpdate) {
       const attachmentUrls = attachments.map(a => a.base64 || a.file_path).join(',');
       onUpdate({
@@ -179,7 +209,11 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
         payment_method: (editForm.payment_method as PaymentMethod) || undefined,
         follow_up: editForm.follow_up || undefined,
         price_change: editForm.price_change || undefined,
-        attachment_url: attachmentUrls || undefined
+        attachment_url: attachmentUrls || undefined,
+        status: isSettled ? 'settled' : 'pending',
+        paid_date: isSettled 
+          ? (paymentRecords[paymentRecords.length - 1]?.date || new Date().toISOString().split('T')[0]) 
+          : undefined
       });
     }
     setIsEditing(false);
@@ -385,7 +419,16 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                       <p className="text-xs text-slate-400 mb-1">Estado</p>
                       <select
                         value={transaction.status}
-                        onChange={e => onUpdate?.({ ...transaction, status: e.target.value as TransactionStatus })}
+                        onChange={e => {
+                          const newStatus = e.target.value as TransactionStatus;
+                          onUpdate?.({
+                            ...transaction,
+                            status: newStatus,
+                            paid_date: newStatus === 'settled'
+                              ? (transaction.paid_date || new Date().toISOString().split('T')[0])
+                              : undefined
+                          });
+                        }}
                         className="w-full bg-transparent text-white font-medium focus:outline-none cursor-pointer"
                       >
                         {Object.entries(STATUS_LABELS).map(([key, label]) => (
@@ -574,6 +617,51 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
 
               {activeTab === 'history' && (
                 <div className="space-y-6">
+                  {/* Tarjeta de Resumen de Pagos */}
+                  <div className="p-4 bg-slate-800/40 border border-slate-700/40 rounded-xl space-y-2">
+                    <div className="flex justify-between items-center text-xs text-slate-400">
+                      <span>Monto de Transacción</span>
+                      <span>Total Pagado</span>
+                    </div>
+                    <div className="flex justify-between items-center font-bold text-white">
+                      <span>{formatCurrency(transaction.amount)}</span>
+                      <span className={cn(
+                        transaction.status === 'settled' ? 'text-emerald-400' : 'text-amber-400'
+                      )}>
+                        {formatCurrency(paymentRecords.reduce((sum, r) => sum + r.amount, 0))}
+                      </span>
+                    </div>
+                    {/* Barra de progreso */}
+                    <div className="w-full bg-slate-700/50 h-2 rounded-full overflow-hidden">
+                      <div 
+                        className={cn(
+                          "h-full transition-all duration-300",
+                          transaction.status === 'settled' ? 'bg-emerald-500' : 'bg-amber-500'
+                        )}
+                        style={{ 
+                          width: `${Math.min(
+                            100, 
+                            transaction.amount > 0 
+                              ? (paymentRecords.reduce((sum, r) => sum + r.amount, 0) / transaction.amount) * 100 
+                              : (paymentRecords.length > 0 ? 100 : 0)
+                          )}%` 
+                        }}
+                      />
+                    </div>
+                    {transaction.amount > 0 && (
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-slate-500">Restante</span>
+                        <span className={cn(
+                          transaction.amount - paymentRecords.reduce((sum, r) => sum + r.amount, 0) <= 0 
+                            ? 'text-emerald-400 font-medium' 
+                            : 'text-slate-400 font-medium'
+                        )}>
+                          {formatCurrency(Math.max(0, transaction.amount - paymentRecords.reduce((sum, r) => sum + r.amount, 0)))}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
                     <h4 className="text-blue-400 font-medium mb-3 flex items-center gap-2">
                       <Plus className="w-4 h-4" />
