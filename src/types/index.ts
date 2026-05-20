@@ -45,7 +45,7 @@ export const COMMON_EMOJIS = ['💼', '🏢', '🏖️', '💻', '🎵', '🚗',
 
 export type RecurrenceType = 'weekly' | 'monthly' | 'bimonthly' | 'quarterly' | 'triennial' | 'yearly' | 'none';
 
-export type TransactionStatus = 'pending' | 'settled' | 'cancelled';
+export type TransactionStatus = 'pending' | 'partial' | 'settled' | 'cancelled';
 
 export type PaymentMethod = 'transfer' | 'cash' | 'card' | 'check' | 'other';
 
@@ -120,6 +120,8 @@ export interface Transaction {
   follow_up?: string;
   attachment_url?: string;
   price_change?: number;
+  contact_id?: string;
+  payment_destination?: string;
   created_at: string;
   updated_at: string;
 }
@@ -161,6 +163,21 @@ export interface Attachment {
   file_type: string;
   file_size: number;
   created_at: string;
+}
+
+export interface Contact {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  bank_name?: string;
+  bank_account?: string;
+  bank_clabe?: string;
+  payment_method_preferred?: PaymentMethod;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface LiquidityMetrics {
@@ -260,12 +277,14 @@ export const ENTITY_COLORS: Record<string, string> = {
 
 export const STATUS_LABELS: Record<TransactionStatus, string> = {
   pending: 'Pendiente',
+  partial: 'Parcial',
   settled: 'Liquidado',
   cancelled: 'Cancelado'
 };
 
 export const STATUS_COLORS: Record<TransactionStatus, string> = {
   pending: 'bg-amber-500/20 text-amber-400',
+  partial: 'bg-blue-500/20 text-blue-400',
   settled: 'bg-emerald-500/20 text-emerald-400',
   cancelled: 'bg-red-500/20 text-red-400'
 };

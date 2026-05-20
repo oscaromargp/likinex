@@ -3,7 +3,7 @@
 import { useState, useEffect, Suspense, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { LayoutDashboard, Calendar, FileText, Settings, Plus, Bell, LogOut, User } from 'lucide-react';
+import { LayoutDashboard, Calendar, FileText, Settings, Plus, Bell, LogOut, User, Users } from 'lucide-react';
 import CalendarComponent from '@/components/Calendar';
 import Ledger from '@/components/Ledger';
 import SideDrawer from '@/components/SideDrawer';
@@ -13,7 +13,8 @@ import SettingsComponent from '@/components/Settings';
 import CreditCardEngine from '@/components/CreditCardEngine';
 import RiskToleranceEngine from '@/components/RiskToleranceEngine';
 import CashFlowForecast from '@/components/CashFlowForecast';
-import { Transaction, CalendarEvent, EntityConfig, DEFAULT_ENTITIES } from '@/types';
+import Contacts from '@/components/Contacts';
+import { Transaction, CalendarEvent, EntityConfig, DEFAULT_ENTITIES, Contact } from '@/types';
 import { mockCreditCards } from '@/lib/mockData';
 import { calculateMetrics, generateCalendarEvents } from '@/lib/userData';
 import { getSmartAlerts } from '@/components/RiskToleranceEngine';
@@ -70,13 +71,67 @@ function mapTransactionToDB(tx: Transaction, userId: string): Omit<TransactionDB
   };
 }
 
+const INITIAL_CONTACTS: Contact[] = [
+  {
+    id: 'contact_cfe',
+    name: 'CFE (Comisión Federal de Electricidad)',
+    phone: '5511223344',
+    email: 'pagos@cfe.mx',
+    address: 'Av. Paseo de la Reforma, CDMX',
+    bank_name: 'BBVA Bancomer',
+    bank_clabe: '012180001234567892',
+    bank_account: '0123456789',
+    payment_method_preferred: 'transfer',
+    notes: 'Pago de electricidad bimestral. Variable.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'contact_telmex',
+    name: 'Telmex (Servicios de Internet)',
+    phone: '8001232222',
+    email: 'factura@telmex.com',
+    address: 'Av. Marina Nacional, CDMX',
+    bank_name: 'Santander',
+    bank_clabe: '014180009876543210',
+    bank_account: '987654321',
+    payment_method_preferred: 'card',
+    notes: 'Pago mensual de internet y telefonía. Fijo.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'contact_limpieza',
+    name: 'Doña María (Servicio de Limpieza)',
+    phone: '5599887766',
+    bank_name: 'BanCoppel',
+    bank_clabe: '137180004561237890',
+    payment_method_preferred: 'cash',
+    notes: 'Limpieza los días 15 y 30. Se paga en efectivo o transferencia.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: 'contact_renta',
+    name: 'Arrendadora Centenario (Renta Oficina)',
+    phone: '5566778899',
+    email: 'rentas@centenario.com',
+    bank_name: 'Banorte',
+    bank_clabe: '072180002581473695',
+    payment_method_preferred: 'transfer',
+    notes: 'Renta mensual de la oficina principal. Límite el día 5.',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  }
+];
+
 function DashboardContent() {
   const { user, signOut, isLoading: authLoading, isDemo } = useAuth();
   const { resolvedTheme } = useTheme();
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [activeView, setActiveView] = useState<'dashboard' | 'calendar' | 'ledger' | 'settings'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'calendar' | 'ledger' | 'settings' | 'contacts'>('dashboard');
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showPDFReport, setShowPDFReport] = useState(false);
@@ -86,6 +141,7 @@ function DashboardContent() {
   const [demoTransactions, setDemoTransactions] = useState<Transaction[]>([]);
   const [demoEntities, setDemoEntities] = useState<EntityConfig[]>([]);
   const [demoCategories, setDemoCategories] = useState<string[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
 
   const { data: dbTransactions = [], isLoading: loadingTransactions } = useTransactions(user?.id);
   const createTransaction = useCreateTransaction();
@@ -140,6 +196,57 @@ function DashboardContent() {
       }
     }
   }, [isDemo]);
+
+  // Load and save contacts locally
+  useEffect(() => {
+    const savedContacts = localStorage.getItem('likinex_contacts');
+    if (savedContacts) {
+      try {
+        setContacts(JSON.parse(savedContacts));
+      } catch (e) {
+        setContacts(INITIAL_CONTACTS);
+      }
+    } else {
+      setContacts(INITIAL_CONTACTS);
+      localStorage.setItem('likinex_contacts', JSON.stringify(INITIAL_CONTACTS));
+    }
+  }, []);
+
+  const updateContacts = (newContacts: Contact[]) => {
+    setContacts(newContacts);
+    localStorage.setItem('likinex_contacts', JSON.stringify(newContacts));
+  };
+
+  const handleAddContact = (contact: Contact) => {
+    updateContacts([...contacts, contact]);
+  };
+
+  const handleUpdateContact = (updated: Contact) => {
+    updateContacts(contacts.map(c => c.id === updated.id ? updated : c));
+  };
+
+  const handleDeleteContact = (id: string) => {
+    updateContacts(contacts.filter(c => c.id !== id));
+  };
+
+  const handleCreateTransactionForContact = (contact: Contact) => {
+    const newTx: Transaction = {
+      id: `new_${Date.now()}`,
+      description: `Pago a ${contact.name}`,
+      amount: 0,
+      due_date: new Date().toISOString().split('T')[0],
+      entity: 'oscaromargp', // Default entity
+      status: 'pending',
+      recurrence: 'none',
+      payment_method: contact.payment_method_preferred || 'transfer',
+      contact_id: contact.id,
+      payment_destination: contact.bank_clabe || contact.bank_account || '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    setSelectedTransaction(newTx);
+    setIsDrawerOpen(true);
+  };
 
   // Auxiliares para actualizar estados demo y guardarlos en localStorage
   const updateDemoTransactions = (newTx: Transaction[]) => {
@@ -467,6 +574,7 @@ function DashboardContent() {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'calendar', label: 'Calendario', icon: Calendar },
     { id: 'ledger', label: 'Transacciones', icon: FileText },
+    { id: 'contacts', label: 'Contactos', icon: Users },
     { id: 'settings', label: 'Configuración', icon: Settings }
   ] as const;
 
@@ -654,6 +762,21 @@ function DashboardContent() {
               </motion.div>
             )}
 
+            {activeView === 'contacts' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <Contacts
+                  contacts={contacts}
+                  onAddContact={handleAddContact}
+                  onUpdateContact={handleUpdateContact}
+                  onDeleteContact={handleDeleteContact}
+                  onCreateTransactionForContact={handleCreateTransactionForContact}
+                />
+              </motion.div>
+            )}
+
             {activeView === 'settings' && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -685,6 +808,7 @@ function DashboardContent() {
         onDelete={handleDeleteTransaction}
         allTransactions={transactions}
         entities={entities}
+        contacts={contacts}
       />
 
       <PDFReport

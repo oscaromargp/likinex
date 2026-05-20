@@ -2,8 +2,8 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, DollarSign, FileText, Clock, CreditCard, Paperclip, Save, Upload, Trash2, Eye, Download, Image as ImageIcon, Edit3, Plus, History } from 'lucide-react';
-import { Transaction, TransactionStatus, PaymentMethod, ENTITY_LABELS, STATUS_LABELS, Currency, CURRENCY_SYMBOLS, convertCurrency, calculatePunctuality, calculateConsecutiveOnTime, getScoreLabel, Attachment, EntityConfig, DEFAULT_ENTITIES, getEntityIcon, getEntityLabel, CATEGORY_LABELS, Category } from '@/types';
+import { X, Calendar, DollarSign, FileText, Clock, CreditCard, Paperclip, Save, Upload, Trash2, Eye, Download, Image as ImageIcon, Edit3, Plus, History, Landmark, Check, Copy, User } from 'lucide-react';
+import { Transaction, TransactionStatus, PaymentMethod, RecurrenceType, Contact, ENTITY_LABELS, STATUS_LABELS, Currency, CURRENCY_SYMBOLS, convertCurrency, calculatePunctuality, calculateConsecutiveOnTime, getScoreLabel, Attachment, EntityConfig, DEFAULT_ENTITIES, getEntityIcon, getEntityLabel, CATEGORY_LABELS, Category } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +16,30 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string }[] =
   { value: 'other', label: 'Otro', icon: '📦' },
 ];
 
+const RECURRENCE_OPTIONS: { value: RecurrenceType; label: string }[] = [
+  { value: 'none', label: 'Sin recurrencia' },
+  { value: 'weekly', label: 'Semanal' },
+  { value: 'monthly', label: 'Mensual' },
+  { value: 'bimonthly', label: 'Bimestral' },
+  { value: 'quarterly', label: 'Trimestral' },
+  { value: 'yearly', label: 'Anual' },
+  { value: 'triennial', label: 'Trienal' }
+];
+
+const getFileIcon = (type: string) => {
+  if (type.startsWith('image/')) return ImageIcon;
+  if (type === 'application/pdf') return FileText;
+  return FileText;
+};
+
+const formatFileSize = (bytes: number) => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+};
+
 interface SideDrawerProps {
   transaction: Transaction | null;
   isOpen: boolean;
@@ -24,6 +48,7 @@ interface SideDrawerProps {
   onDelete?: (id: string) => void;
   allTransactions?: Transaction[];
   entities?: EntityConfig[];
+  contacts?: Contact[];
 }
 
 interface AttachmentWithPreview extends Attachment {
@@ -40,8 +65,17 @@ interface PaymentRecord {
   notes: string;
 }
 
-export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onDelete, allTransactions = [], entities = [] }: SideDrawerProps) {
-  const [activeTab, setActiveTab] = useState<'details' | 'payment' | 'followup' | 'attachments' | 'history'>('details');
+export default function SideDrawer({
+  transaction,
+  isOpen,
+  onClose,
+  onUpdate,
+  onDelete,
+  allTransactions = [],
+  entities = [],
+  contacts = []
+}: SideDrawerProps) {
+  const [activeTab, setActiveTab] = useState<'details' | 'execution'>('details');
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -57,12 +91,17 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
     currency: 'MXN' as Currency,
     displayCurrency: 'MXN' as Currency,
     isMsi: false,
-    msiMonths: 12
+    msiMonths: 12,
+    contact_id: '',
+    payment_destination: '',
+    recurrence: 'none' as RecurrenceType
   });
+  
   const [attachments, setAttachments] = useState<AttachmentWithPreview[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState<AttachmentWithPreview | null>(null);
   const [paymentRecords, setPaymentRecords] = useState<PaymentRecord[]>([]);
+  
   const [newPayment, setNewPayment] = useState<Partial<PaymentRecord>>({
     amount: 0,
     method: 'transfer',
@@ -70,6 +109,7 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
     date: new Date().toISOString().split('T')[0],
     notes: ''
   });
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -87,7 +127,10 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
         currency: 'MXN',
         displayCurrency: 'MXN',
         isMsi: false,
-        msiMonths: 12
+        msiMonths: 12,
+        contact_id: transaction.contact_id || '',
+        payment_destination: transaction.payment_destination || '',
+        recurrence: transaction.recurrence || 'none'
       });
       setIsEditing(transaction.id.startsWith('new_'));
       setShowDeleteConfirm(false);
@@ -127,19 +170,26 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
     const updated = [...paymentRecords, record];
     savePaymentRecords(updated);
 
-    // Auto-settle logic
+    // Auto-settle & Partial status logic
     const totalPaid = updated.reduce((sum, r) => sum + r.amount, 0);
     const isSettled = transaction.amount > 0 ? (totalPaid >= transaction.amount) : (totalPaid > 0);
+    const calculatedStatus: TransactionStatus = isSettled ? 'settled' : (totalPaid > 0 ? 'partial' : 'pending');
 
     if (onUpdate) {
       onUpdate({
         ...transaction,
-        status: isSettled ? 'settled' : 'pending',
+        status: calculatedStatus,
         paid_date: isSettled ? record.date : undefined
       });
     }
 
-    setNewPayment({ amount: 0, method: 'transfer', recipient: '', date: new Date().toISOString().split('T')[0], notes: '' });
+    setNewPayment({
+      amount: Math.max(0, transaction.amount - totalPaid),
+      method: 'transfer',
+      recipient: '',
+      date: new Date().toISOString().split('T')[0],
+      notes: ''
+    });
   };
 
   const deletePaymentRecord = (id: string) => {
@@ -147,14 +197,15 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
     const updated = paymentRecords.filter(r => r.id !== id);
     savePaymentRecords(updated);
 
-    // Auto-settle logic
+    // Auto-settle & Partial status logic
     const totalPaid = updated.reduce((sum, r) => sum + r.amount, 0);
     const isSettled = transaction.amount > 0 ? (totalPaid >= transaction.amount) : (totalPaid > 0);
+    const calculatedStatus: TransactionStatus = isSettled ? 'settled' : (totalPaid > 0 ? 'partial' : 'pending');
 
     if (onUpdate) {
       onUpdate({
         ...transaction,
-        status: isSettled ? 'settled' : 'pending',
+        status: calculatedStatus,
         paid_date: isSettled 
           ? (updated[updated.length - 1]?.date || new Date().toISOString().split('T')[0]) 
           : undefined
@@ -191,6 +242,12 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
     }
   }, [transaction?.id, transaction?.attachment_url]);
 
+  useEffect(() => {
+    if (activeTab === 'execution') {
+      loadAttachments();
+    }
+  }, [activeTab, loadAttachments]);
+
   if (!transaction) return null;
 
   const punctuality = calculatePunctuality(transaction.due_date, transaction.paid_date);
@@ -201,6 +258,7 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
   const handleSave = () => {
     const totalPaid = paymentRecords.reduce((sum, r) => sum + r.amount, 0);
     const isSettled = editForm.amount > 0 ? (totalPaid >= editForm.amount) : (totalPaid > 0);
+    const calculatedStatus: TransactionStatus = isSettled ? 'settled' : (totalPaid > 0 ? 'partial' : 'pending');
     const attachmentUrls = attachments.map(a => a.base64 || a.file_path).join(',');
 
     if (onUpdate) {
@@ -228,6 +286,9 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
             price_change: editForm.price_change || undefined,
             attachment_url: attachmentUrls || undefined,
             status: 'pending',
+            contact_id: editForm.contact_id || undefined,
+            payment_destination: editForm.payment_destination || undefined,
+            recurrence: 'none'
           });
         }
         onUpdate(installments);
@@ -244,7 +305,10 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
           follow_up: editForm.follow_up || undefined,
           price_change: editForm.price_change || undefined,
           attachment_url: attachmentUrls || undefined,
-          status: isSettled ? 'settled' : 'pending',
+          status: calculatedStatus,
+          contact_id: editForm.contact_id || undefined,
+          payment_destination: editForm.payment_destination || undefined,
+          recurrence: editForm.recurrence || 'none',
           paid_date: isSettled 
             ? (paymentRecords[paymentRecords.length - 1]?.date || new Date().toISOString().split('T')[0]) 
             : undefined
@@ -253,11 +317,6 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
     }
     setIsEditing(false);
     onClose();
-  };
-
-  const saveAttachments = (newAttachments: AttachmentWithPreview[]) => {
-    setAttachments(newAttachments);
-    localStorage.setItem(`likinex_attachments_${transaction.id}`, JSON.stringify(newAttachments));
   };
 
   const processFile = (file: File) => {
@@ -300,6 +359,11 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
     Array.from(files).forEach(processFile);
   };
 
+  const saveAttachments = (newAttachments: AttachmentWithPreview[]) => {
+    setAttachments(newAttachments);
+    localStorage.setItem(`likinex_attachments_${transaction.id}`, JSON.stringify(newAttachments));
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -317,20 +381,6 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
     }
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
-
-  const getFileIcon = (type: string) => {
-    if (type.startsWith('image/')) return ImageIcon;
-    if (type === 'application/pdf') return FileText;
-    return FileText;
-  };
-
   const downloadAttachment = (attachment: AttachmentWithPreview) => {
     if (attachment.base64) {
       const link = document.createElement('a');
@@ -341,14 +391,14 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
   };
 
   const tabs = [
-    { id: 'details', label: 'Detalles', icon: FileText },
-    { id: 'payment', label: 'Pago', icon: CreditCard },
-    { id: 'history', label: 'Historial', icon: History },
-    { id: 'followup', label: 'Seguimiento', icon: Clock },
-    { id: 'attachments', label: 'Adjuntos', icon: Paperclip, count: attachments.length }
+    { id: 'details', label: 'Detalles del Pago', icon: FileText },
+    { id: 'execution', label: 'Abonos y Recibos', icon: DollarSign, count: paymentRecords.length + attachments.length }
   ] as const;
 
-  const allEntities = [...DEFAULT_ENTITIES, ...entities.filter(e => !DEFAULT_ENTITIES.find(d => d.id === e.id))];
+  const totalPaid = paymentRecords.reduce((sum, r) => sum + r.amount, 0);
+  const remainingAmount = Math.max(0, transaction.amount - totalPaid);
+
+  const selectedContact = contacts.find(c => c.id === editForm.contact_id);
 
   return (
     <AnimatePresence>
@@ -368,25 +418,30 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
             className="fixed right-0 top-0 h-full w-full max-w-md bg-slate-900 border-l border-emerald-500/20 z-50 flex flex-col"
           >
+            {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-slate-800/50">
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <h2 className="text-lg font-bold text-white">
-                    {isEditing ? 'Editar Transacción' : 'Gestión de Transacción'}
+                    {isEditing ? 'Editar Operación' : 'Gestión de Operación'}
                   </h2>
-                  <button
-                    onClick={() => setIsEditing(!isEditing)}
-                    className="p-1 rounded hover:bg-slate-700 transition-colors"
-                  >
-                    <Edit3 className="w-4 h-4 text-slate-400" />
-                  </button>
+                  {!transaction.id.startsWith('new_') && (
+                    <button
+                      onClick={() => setIsEditing(!isEditing)}
+                      className="p-1 rounded hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                      title="Editar transacción"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
                 {isEditing ? (
                   <input
                     type="text"
                     value={editForm.description}
                     onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1 text-sm text-white focus:outline-none focus:border-blue-500"
+                    placeholder="Descripción de la operación"
+                    className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-emerald-500/50"
                   />
                 ) : (
                   <p className="text-sm text-slate-400">{transaction.description}</p>
@@ -394,20 +449,18 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 transition-colors"
+                className="p-2 rounded-lg bg-slate-800/50 hover:bg-slate-700/50 transition-colors ml-4"
               >
                 <X className="w-5 h-5 text-slate-400" />
               </button>
             </div>
 
+            {/* Consolidated 2 Tabs */}
             <div className="flex border-b border-slate-800/50">
               {tabs.map(tab => (
                 <button
                   key={tab.id}
-                  onClick={() => {
-                    setActiveTab(tab.id);
-                    if (tab.id === 'attachments') loadAttachments();
-                  }}
+                  onClick={() => setActiveTab(tab.id)}
                   className={cn(
                     'flex-1 py-3 px-4 text-sm font-medium transition-colors flex items-center justify-center gap-2',
                     activeTab === tab.id
@@ -426,17 +479,21 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
               ))}
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6">
+            {/* Scrollable Container */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              
+              {/* TAB 1: DETAILS */}
               {activeTab === 'details' && (
-                <div className="space-y-6">
+                <div className="space-y-5">
+                  {/* Entity and Category */}
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-slate-800/50 rounded-xl">
-                      <p className="text-xs text-slate-400 mb-1">Entidad</p>
+                    <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
+                      <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Entidad</p>
                       {isEditing ? (
                         <select
                           value={editForm.entity}
                           onChange={e => setEditForm(f => ({ ...f, entity: e.target.value }))}
-                          className="w-full bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                          className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
                         >
                           {entities.map(ent => (
                             <option key={ent.id} value={ent.id} className="bg-slate-900 text-white">
@@ -445,42 +502,19 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                           ))}
                         </select>
                       ) : (
-                        <p className="text-white font-medium">
+                        <p className="text-white text-sm font-medium">
                           {getEntityIcon(transaction.entity, entities)} {getEntityLabel(transaction.entity, entities)}
                         </p>
                       )}
                     </div>
-                    <div className="p-4 bg-slate-800/50 rounded-xl">
-                      <p className="text-xs text-slate-400 mb-1">Estado</p>
-                      <select
-                        value={transaction.status}
-                        onChange={e => {
-                          const newStatus = e.target.value as TransactionStatus;
-                          onUpdate?.({
-                            ...transaction,
-                            status: newStatus,
-                            paid_date: newStatus === 'settled'
-                              ? (transaction.paid_date || new Date().toISOString().split('T')[0])
-                              : undefined
-                          });
-                        }}
-                        className="w-full bg-transparent text-white font-medium focus:outline-none cursor-pointer"
-                      >
-                        {Object.entries(STATUS_LABELS).map(([key, label]) => (
-                          <option key={key} value={key} className="bg-slate-900 text-white">{label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-4 bg-slate-800/50 rounded-xl">
-                      <p className="text-xs text-slate-400 mb-1">Categoría</p>
+                    <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
+                      <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Categoría</p>
                       {isEditing ? (
                         <select
                           value={editForm.category}
                           onChange={e => setEditForm(f => ({ ...f, category: e.target.value }))}
-                          className="w-full bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                          className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
                         >
                           <option value="otro" className="bg-slate-900 text-white">Otro</option>
                           {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
@@ -492,55 +526,158 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                           ))}
                         </select>
                       ) : (
-                        <p className="text-white font-medium">
+                        <p className="text-white text-sm font-medium">
                           {CATEGORY_LABELS[transaction.category as keyof typeof CATEGORY_LABELS] || transaction.category || 'Otro'}
                         </p>
                       )}
                     </div>
-                    <div className="p-4 bg-slate-800/50 rounded-xl">
-                      <p className="text-xs text-slate-400 mb-1">Fecha Límite</p>
+                  </div>
+
+                  {/* Dates & Recurrence */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
+                      <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Fecha Límite</p>
                       {isEditing ? (
                         <input
                           type="date"
                           value={editForm.due_date}
                           onChange={e => setEditForm(f => ({ ...f, due_date: e.target.value }))}
-                          className="w-full bg-transparent text-white font-medium focus:outline-none cursor-pointer"
+                          className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
                         />
                       ) : (
-                        <p className="text-white font-medium">{formatDate(transaction.due_date)}</p>
+                        <p className="text-white text-sm font-medium">{formatDate(transaction.due_date)}</p>
+                      )}
+                    </div>
+
+                    <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
+                      <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Periodicidad / Recurrencia</p>
+                      {isEditing ? (
+                        <select
+                          value={editForm.recurrence}
+                          onChange={e => setEditForm(f => ({ ...f, recurrence: e.target.value as RecurrenceType }))}
+                          className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
+                        >
+                          {RECURRENCE_OPTIONS.map(o => (
+                            <option key={o.value} value={o.value} className="bg-slate-900 text-white">
+                              {o.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="text-white text-sm font-medium">
+                          🔄 {RECURRENCE_OPTIONS.find(o => o.value === transaction.recurrence)?.label || 'Sin recurrencia'}
+                        </p>
                       )}
                     </div>
                   </div>
 
-                  <div className="p-4 bg-slate-800/50 rounded-xl">
+                  {/* Contact / Beneficiary Selection */}
+                  <div className="p-4 bg-slate-800/30 border border-slate-800 rounded-2xl space-y-4">
+                    <div className="flex items-center gap-2 text-emerald-400 text-xs font-semibold">
+                      <User className="w-4 h-4" />
+                      <span>Beneficiario y Cuenta de Pago</span>
+                    </div>
+
+                    {isEditing ? (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-[10px] text-slate-500 block mb-1">Seleccionar Contacto Guardado</label>
+                          <select
+                            value={editForm.contact_id}
+                            onChange={e => {
+                              const cid = e.target.value;
+                              const contact = contacts.find(c => c.id === cid);
+                              setEditForm(f => ({
+                                ...f,
+                                contact_id: cid,
+                                payment_method: contact?.payment_method_preferred || f.payment_method,
+                                payment_destination: contact ? `${contact.bank_name || ''} - CLABE: ${contact.bank_clabe || contact.bank_account || ''}` : f.payment_destination
+                              }));
+                            }}
+                            className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50"
+                          >
+                            <option value="">Ninguno (Registro manual)</option>
+                            {contacts.map(c => (
+                              <option key={c.id} value={c.id}>{c.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 block mb-1">Cuenta Destino de Pago</label>
+                          <input
+                            type="text"
+                            placeholder="Ej. BBVA CLABE 0123... o Tarjeta"
+                            value={editForm.payment_destination}
+                            onChange={e => setEditForm(f => ({ ...f, payment_destination: e.target.value }))}
+                            className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5 text-sm">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500 text-xs">Beneficiario</span>
+                          <span className="text-white font-semibold">
+                            {selectedContact ? selectedContact.name : 'Ingreso manual'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-start">
+                          <span className="text-slate-500 text-xs mt-0.5">Destino de Pago</span>
+                          <span className="text-white font-mono text-xs text-right max-w-[200px] break-words">
+                            {transaction.payment_destination || 'No especificada'}
+                          </span>
+                        </div>
+                        {selectedContact && (
+                          <div className="pt-2 border-t border-slate-800/80 flex justify-between items-center text-xs">
+                            <span className="text-slate-500">Teléfono</span>
+                            <span className="text-slate-300">{selectedContact.phone || 'No registrado'}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Amount and Display Currency */}
+                  <div className="p-4 bg-slate-800/50 border border-slate-800/60 rounded-xl">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs text-slate-400">Monto</p>
+                      <p className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Monto</p>
                       <select
                         value={editForm.displayCurrency}
                         onChange={e => setEditForm(f => ({ ...f, displayCurrency: e.target.value as Currency }))}
-                        className="bg-slate-700/50 text-xs text-white px-2 py-1 rounded-lg border border-slate-600 cursor-pointer"
+                        className="bg-slate-750 text-xs text-white px-2 py-1 rounded-lg border border-slate-700 cursor-pointer focus:outline-none"
                       >
                         {CURRENCIES.map(c => (
                           <option key={c} value={c} className="bg-slate-900 text-white">{c}</option>
                         ))}
                       </select>
                     </div>
+
                     {isEditing ? (
                       <div className="flex items-center gap-2">
-                        <span className="text-lg font-semibold text-emerald-400">MXN $</span>
+                        <span className="text-lg font-bold text-emerald-400">MXN $</span>
                         <input
                           type="number"
                           step="0.01"
                           value={editForm.amount}
                           onChange={e => setEditForm(f => ({ ...f, amount: Number(e.target.value) }))}
-                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-lg font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-lg font-bold text-emerald-400 focus:outline-none focus:border-emerald-500"
                         />
                       </div>
                     ) : (
                       <>
-                        <p className="text-2xl font-bold text-emerald-400">
-                          {CURRENCY_SYMBOLS[editForm.displayCurrency]}{convertAndDisplay(transaction.amount, 'MXN', editForm.displayCurrency).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </p>
+                        <div className="flex justify-between items-baseline">
+                          <p className="text-2xl font-black text-emerald-400">
+                            {CURRENCY_SYMBOLS[editForm.displayCurrency]}{convertAndDisplay(transaction.amount, 'MXN', editForm.displayCurrency).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                          <span className={cn(
+                            'text-xs font-semibold px-2 py-1 rounded-full border',
+                            transaction.status === 'settled' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                            transaction.status === 'partial' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' :
+                            'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                          )}>
+                            {STATUS_LABELS[transaction.status]}
+                          </span>
+                        </div>
                         {editForm.displayCurrency !== 'MXN' && (
                           <p className="text-xs text-slate-500 mt-1">≈ {formatCurrency(transaction.amount)} MXN</p>
                         )}
@@ -548,18 +685,19 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                     )}
                   </div>
 
+                  {/* MSI Checkbox */}
                   {isEditing && transaction.id.startsWith('new_') && (
-                    <div className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/30">
+                    <div className="p-4 bg-slate-800/40 border border-slate-700/30 rounded-xl">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-xs text-slate-400 mb-1">Diferir a Meses sin Intereses (MSI)</p>
-                          <p className="text-sm font-semibold text-white">¿Es compra a MSI?</p>
+                          <p className="text-xs text-slate-400 mb-1 font-semibold">Diferir a Meses sin Intereses (MSI)</p>
+                          <p className="text-sm text-white">¿Es compra a MSI?</p>
                         </div>
                         <input
                           type="checkbox"
                           checked={editForm.isMsi}
                           onChange={e => setEditForm(f => ({ ...f, isMsi: e.target.checked }))}
-                          className="w-4 h-4 text-emerald-500 bg-slate-700 border-slate-600 rounded focus:ring-emerald-500 focus:ring-2 cursor-pointer animate-pulse"
+                          className="w-4 h-4 text-emerald-500 bg-slate-700 border-slate-600 rounded focus:ring-emerald-500 cursor-pointer"
                         />
                       </div>
                       
@@ -570,7 +708,7 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                             <select
                               value={editForm.msiMonths}
                               onChange={e => setEditForm(f => ({ ...f, msiMonths: Number(e.target.value) }))}
-                              className="w-full bg-slate-700 border border-slate-600 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500 cursor-pointer"
+                              className="w-full bg-slate-750 border border-slate-650 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none"
                             >
                               {[3, 6, 9, 12, 18, 24].map(months => (
                                 <option key={months} value={months}>{months} meses</option>
@@ -578,7 +716,7 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                             </select>
                           </div>
                           <div>
-                            <p className="text-xs text-slate-400 block mb-1">Pago mensual estimado</p>
+                            <p className="text-[10px] text-slate-400 block mb-1">Cuota Mensual</p>
                             <p className="text-sm font-bold text-emerald-400">
                               MXN ${editForm.amount > 0 ? (editForm.amount / editForm.msiMonths).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}
                             </p>
@@ -588,341 +726,313 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                     </div>
                   )}
 
-                  {transaction.paid_date && !isEditing && (
-                    <div className="p-4 bg-slate-800/50 rounded-xl">
-                      <p className="text-xs text-slate-400 mb-1">Fecha de Pago</p>
-                      <p className="text-white font-medium">{formatDate(transaction.paid_date)}</p>
-                    </div>
-                  )}
+                  {/* Payment Method / Follow up & Price Change */}
+                  <div className="p-4 bg-slate-800/30 border border-slate-800 rounded-xl space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block mb-1">Método de Pago</label>
+                        {isEditing ? (
+                          <select
+                            value={editForm.payment_method}
+                            onChange={e => setEditForm(f => ({ ...f, payment_method: e.target.value }))}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                          >
+                            <option value="">Seleccionar...</option>
+                            <option value="transfer">Transferencia</option>
+                            <option value="cash">Efectivo</option>
+                            <option value="card">Tarjeta</option>
+                            <option value="check">Cheque</option>
+                            <option value="other">Otro</option>
+                          </select>
+                        ) : (
+                          <p className="text-white text-xs font-semibold">
+                            {PAYMENT_METHODS.find(m => m.value === transaction.payment_method)?.icon || '📦'} {PAYMENT_METHODS.find(m => m.value === transaction.payment_method)?.label || 'Otro'}
+                          </p>
+                        )}
+                      </div>
 
-                  {punctuality && (
-                    <div className="p-4 bg-slate-800/50 rounded-xl">
-                      <p className="text-xs text-slate-400 mb-2">Score de Puntualidad</p>
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          'text-3xl font-bold',
-                          punctuality.level === 'on-time' ? 'text-emerald-400' :
-                          punctuality.level === 'slightly-late' ? 'text-yellow-400' :
-                          'text-red-400'
-                        )}>
-                          {punctuality.score}/100
-                        </div>
-                        <div>
-                          <p className="text-white font-medium">{getScoreLabel(punctuality.score)}</p>
-                          {consecutiveOnTime > 1 && (
-                            <p className="text-xs text-emerald-400">{consecutiveOnTime} pagos consecutivos puntuales</p>
-                          )}
-                        </div>
+                      <div>
+                        <label className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block mb-1">Seguimiento</label>
+                        {isEditing ? (
+                          <input
+                            type="datetime-local"
+                            value={editForm.follow_up}
+                            onChange={e => setEditForm(f => ({ ...f, follow_up: e.target.value }))}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-1.5 text-xs text-white focus:outline-none"
+                          />
+                        ) : (
+                          <p className="text-white text-xs font-medium">
+                            {transaction.follow_up ? formatDate(transaction.follow_up) : 'Sin recordatorio'}
+                          </p>
+                        )}
                       </div>
                     </div>
-                  )}
 
-                  <div>
-                    <label className="text-xs text-slate-400 mb-2 block">Notas</label>
-                    <textarea
-                      value={editForm.notes}
-                      onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
-                      placeholder="Agregar notas..."
-                      rows={4}
-                      className="w-full p-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 transition-colors resize-none"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'payment' && (
-                <div className="space-y-6">
-                  <div>
-                    <label className="text-xs text-slate-400 mb-2 block">Método de Pago</label>
-                    <select
-                      value={editForm.payment_method}
-                      onChange={e => setEditForm(f => ({ ...f, payment_method: e.target.value }))}
-                      className="w-full p-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
-                    >
-                      <option value="">Seleccionar...</option>
-                      <option value="transfer">Transferencia</option>
-                      <option value="cash">Efectivo</option>
-                      <option value="card">Tarjeta</option>
-                      <option value="check">Cheque</option>
-                      <option value="other">Otro</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-xs text-slate-400 mb-2 block">Cambio de Precio (MXN)</label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                      <input
-                        type="number"
-                        value={editForm.price_change}
-                        onChange={e => setEditForm(f => ({ ...f, price_change: Number(e.target.value) }))}
-                        className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
-                      />
-                    </div>
-                    <p className="text-xs text-slate-500 mt-2">
-                      Precio original: {formatCurrency(transaction.amount)}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'followup' && (
-                <div className="space-y-6">
-                  <div>
-                    <label className="text-xs text-slate-400 mb-2 block">Recordatorio de Seguimiento</label>
-                    <div className="relative">
-                      <Clock className="absolute left-3 top-3 w-4 h-4 text-slate-500" />
-                      <input
-                        type="datetime-local"
-                        value={editForm.follow_up}
-                        onChange={e => setEditForm(f => ({ ...f, follow_up: e.target.value }))}
-                        className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
-                    <h4 className="text-amber-400 font-medium mb-2">⚠️ Alerta de Urgencia</h4>
-                    <p className="text-sm text-slate-400">
-                      Las transacciones pendientes con menos de 72 horas se marcarán como urgentes automáticamente.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 'history' && (
-                <div className="space-y-6">
-                  {/* Tarjeta de Resumen de Pagos */}
-                  <div className="p-4 bg-slate-800/40 border border-slate-700/40 rounded-xl space-y-2">
-                    <div className="flex justify-between items-center text-xs text-slate-400">
-                      <span>Monto de Transacción</span>
-                      <span>Total Pagado</span>
-                    </div>
-                    <div className="flex justify-between items-center font-bold text-white">
-                      <span>{formatCurrency(transaction.amount)}</span>
-                      <span className={cn(
-                        transaction.status === 'settled' ? 'text-emerald-400' : 'text-amber-400'
-                      )}>
-                        {formatCurrency(paymentRecords.reduce((sum, r) => sum + r.amount, 0))}
-                      </span>
-                    </div>
-                    {/* Barra de progreso */}
-                    <div className="w-full bg-slate-700/50 h-2 rounded-full overflow-hidden">
-                      <div 
-                        className={cn(
-                          "h-full transition-all duration-300",
-                          transaction.status === 'settled' ? 'bg-emerald-500' : 'bg-amber-500'
-                        )}
-                        style={{ 
-                          width: `${Math.min(
-                            100, 
-                            transaction.amount > 0 
-                              ? (paymentRecords.reduce((sum, r) => sum + r.amount, 0) / transaction.amount) * 100 
-                              : (paymentRecords.length > 0 ? 100 : 0)
-                          )}%` 
-                        }}
-                      />
-                    </div>
-                    {transaction.amount > 0 && (
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-500">Restante</span>
-                        <span className={cn(
-                          transaction.amount - paymentRecords.reduce((sum, r) => sum + r.amount, 0) <= 0 
-                            ? 'text-emerald-400 font-medium' 
-                            : 'text-slate-400 font-medium'
-                        )}>
-                          {formatCurrency(Math.max(0, transaction.amount - paymentRecords.reduce((sum, r) => sum + r.amount, 0)))}
-                        </span>
+                    {isEditing && (
+                      <div>
+                        <label className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block mb-1">Cambio de Precio (MXN)</label>
+                        <input
+                          type="number"
+                          placeholder="Monto de cambio"
+                          value={editForm.price_change || ''}
+                          onChange={e => setEditForm(f => ({ ...f, price_change: Number(e.target.value) }))}
+                          className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none"
+                        />
                       </div>
                     )}
                   </div>
 
-                  <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl">
-                    <h4 className="text-blue-400 font-medium mb-3 flex items-center gap-2">
-                      <Plus className="w-4 h-4" />
-                      Registrar Pago
-                    </h4>
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-2 gap-2">
-                        <input
-                          type="number"
-                          placeholder="Monto"
-                          value={newPayment.amount || ''}
-                          onChange={e => setNewPayment(p => ({ ...p, amount: Number(e.target.value) }))}
-                          className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Quién recibió"
-                          value={newPayment.recipient || ''}
-                          onChange={e => setNewPayment(p => ({ ...p, recipient: e.target.value }))}
-                          className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <select
-                          value={newPayment.method}
-                          onChange={e => setNewPayment(p => ({ ...p, method: e.target.value as PaymentMethod }))}
-                          className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                        >
-                          {PAYMENT_METHODS.map(m => (
-                            <option key={m.value} value={m.value}>{m.icon} {m.label}</option>
-                          ))}
-                        </select>
-                        <input
-                          type="date"
-                          value={newPayment.date}
-                          onChange={e => setNewPayment(p => ({ ...p, date: e.target.value }))}
-                          className="p-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:outline-none focus:border-blue-500"
-                        />
-                      </div>
-                      <button
-                        onClick={addPaymentRecord}
-                        className="w-full py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Agregar Pago
-                      </button>
+                  {/* Notes */}
+                  <div>
+                    <label className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider block mb-1">Notas y Referencias</label>
+                    {isEditing ? (
+                      <textarea
+                        value={editForm.notes}
+                        onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
+                        placeholder="Escribe notas relevantes de la transacción..."
+                        rows={3}
+                        className="w-full p-3 bg-slate-800/40 border border-slate-700 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none resize-none"
+                      />
+                    ) : (
+                      <p className="text-xs text-slate-300 bg-slate-950/20 p-3 rounded-xl border border-slate-800/60 whitespace-pre-wrap">
+                        {transaction.notes || 'Sin notas adicionales.'}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Punctuality Card */}
+                  {punctuality && !isEditing && (
+                    <div className="p-3 bg-slate-800/20 border border-slate-800/60 rounded-xl flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold tracking-wider">Historial Puntual</span>
+                      <span className="text-xs text-slate-300 font-semibold">
+                        🏆 Score: {punctuality.score}/100 • {consecutiveOnTime} seguidos
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* TAB 2: EXECUTION (Abonos y Recibos) */}
+              {activeTab === 'execution' && (
+                <div className="space-y-6">
+                  {/* Progress Bar Balance */}
+                  <div className="p-4 bg-slate-800/40 border border-slate-800/60 rounded-2xl space-y-3">
+                    <div className="flex justify-between items-center text-xs text-slate-400">
+                      <span>Presupuestado</span>
+                      <span>Total Abonado</span>
+                    </div>
+                    <div className="flex justify-between items-center font-bold text-white">
+                      <span className="text-slate-300">{formatCurrency(transaction.amount)}</span>
+                      <span className={cn(transaction.status === 'settled' ? 'text-emerald-400' : 'text-blue-400')}>
+                        {formatCurrency(totalPaid)}
+                      </span>
+                    </div>
+                    
+                    {/* Visual Progress Bar */}
+                    <div className="w-full bg-slate-950/50 h-2.5 rounded-full overflow-hidden border border-slate-800/40">
+                      <div 
+                        className={cn(
+                          "h-full transition-all duration-300",
+                          transaction.status === 'settled' ? 'bg-emerald-500' : 'bg-blue-500'
+                        )}
+                        style={{ 
+                          width: `${Math.min(
+                            100, 
+                            transaction.amount > 0 ? (totalPaid / transaction.amount) * 100 : (paymentRecords.length > 0 ? 100 : 0)
+                          )}%` 
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex justify-between items-center text-xs pt-1">
+                      <span className="text-slate-500">Restante</span>
+                      <span className={cn(remainingAmount === 0 ? 'text-emerald-400 font-bold' : 'text-slate-400 font-bold')}>
+                        {formatCurrency(remainingAmount)}
+                      </span>
                     </div>
                   </div>
 
+                  {/* Add Abono Form */}
+                  {remainingAmount > 0 && (
+                    <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl">
+                      <h4 className="text-blue-400 font-bold text-xs mb-3 flex items-center gap-1.5 uppercase tracking-wider">
+                        <Plus className="w-4 h-4" />
+                        Registrar Abono Parcial / Pago
+                      </h4>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-1">Monto a Abonar</label>
+                            <input
+                              type="number"
+                              placeholder="Monto"
+                              value={newPayment.amount || ''}
+                              onChange={e => setNewPayment(p => ({ ...p, amount: Number(e.target.value) }))}
+                              className="w-full p-2 bg-slate-850 border border-slate-700 rounded-xl text-white text-xs focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-1">Quién Recibió / Ref</label>
+                            <input
+                              type="text"
+                              placeholder="Ej. Cajero, Telmex, Banco"
+                              value={newPayment.recipient || ''}
+                              onChange={e => setNewPayment(p => ({ ...p, recipient: e.target.value }))}
+                              className="w-full p-2 bg-slate-850 border border-slate-700 rounded-xl text-white text-xs focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-1">Método</label>
+                            <select
+                              value={newPayment.method}
+                              onChange={e => setNewPayment(p => ({ ...p, method: e.target.value as PaymentMethod }))}
+                              className="w-full p-2 bg-slate-850 border border-slate-700 rounded-xl text-white text-xs focus:outline-none"
+                            >
+                              {PAYMENT_METHODS.map(m => (
+                                <option key={m.value} value={m.value}>{m.icon} {m.label}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-1">Fecha de Operación</label>
+                            <input
+                              type="date"
+                              value={newPayment.date}
+                              onChange={e => setNewPayment(p => ({ ...p, date: e.target.value }))}
+                              className="w-full p-2 bg-slate-850 border border-slate-700 rounded-xl text-white text-xs focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={addPaymentRecord}
+                          className="w-full py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 shadow-lg shadow-blue-500/10"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          Agregar Abono
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* List of Registered Abonos */}
                   {paymentRecords.length > 0 && (
-                    <div>
-                      <h4 className="text-sm font-semibold text-slate-400 mb-3">Historial de Pagos</h4>
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Lista de Abonos</h4>
                       <div className="space-y-2">
                         {paymentRecords.map((record) => (
-                          <div key={record.id} className="p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-white font-medium">
-                                {PAYMENT_METHODS.find(m => m.value === record.method)?.icon} {formatCurrency(record.amount)}
-                              </span>
-                              <button
-                                onClick={() => deletePaymentRecord(record.id)}
-                                className="p-1 text-slate-500 hover:text-red-400 transition-colors"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
+                          <div key={record.id} className="p-3 bg-slate-850/60 rounded-xl border border-slate-800 flex justify-between items-start">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-white font-bold text-xs">
+                                  {PAYMENT_METHODS.find(m => m.value === record.method)?.icon} {formatCurrency(record.amount)}
+                                </span>
+                                <span className="text-[10px] text-slate-500 font-medium">• {formatDate(record.date)}</span>
+                              </div>
+                              <p className="text-[11px] text-slate-400 mt-1">👤 Destinatario: {record.recipient}</p>
+                              {record.notes && (
+                                <p className="text-[10px] text-slate-500 mt-0.5 bg-slate-900/30 px-2 py-0.5 rounded italic">
+                                  "{record.notes}"
+                                </p>
+                              )}
                             </div>
-                            <div className="flex items-center gap-2 text-xs text-slate-400">
-                              <span>👤 {record.recipient}</span>
-                              <span>•</span>
-                              <span>{formatDate(record.date)}</span>
-                            </div>
-                            {record.notes && (
-                              <p className="text-xs text-slate-500 mt-1">{record.notes}</p>
-                            )}
+                            <button
+                              onClick={() => deletePaymentRecord(record.id)}
+                              className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {paymentRecords.length === 0 && (
-                    <div className="text-center py-8 text-slate-500">
-                      <History className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                      <p>No hay pagos registrados</p>
-                      <p className="text-xs mt-1">Agrega el primer pago usando el formulario de arriba</p>
+                  {/* Receipt PDFs & Files Upload */}
+                  <div className="pt-4 border-t border-slate-800 space-y-4">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Recibos y Comprobantes</h4>
+                    
+                    <div
+                      onDrop={handleDrop}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      className={cn(
+                        'border-2 border-dashed rounded-2xl p-6 text-center transition-all cursor-pointer',
+                        isDragging ? 'border-emerald-500 bg-emerald-500/5' : 'border-slate-800 hover:border-slate-700 bg-slate-950/20'
+                      )}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileSelect}
+                        multiple
+                        className="hidden"
+                        accept="image/*,application/pdf"
+                      />
+                      <Upload className="w-8 h-8 mx-auto mb-2 text-slate-500" />
+                      <p className="text-xs text-slate-400 font-medium">Arrastra recibos aquí o haz clic para subir</p>
+                      <p className="text-[10px] text-slate-500 mt-1">PDF o Imágenes (Máx. 10MB)</p>
                     </div>
-                  )}
-                </div>
-              )}
 
-              {activeTab === 'attachments' && (
-                <div className="space-y-6">
-                  <div
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    className={cn(
-                      'border-2 border-dashed rounded-xl p-8 text-center transition-colors cursor-pointer',
-                      isDragging
-                        ? 'border-emerald-500 bg-emerald-500/10'
-                        : 'border-slate-700/50 hover:border-slate-600'
-                    )}
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      multiple
-                      accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
-                      onChange={handleFileSelect}
-                      className="hidden"
-                    />
-                    <Upload className="w-8 h-8 text-slate-500 mx-auto mb-3" />
-                    <p className="text-slate-400 text-sm mb-2">
-                      {isDragging ? 'Suelta los archivos aquí' : 'Arrastra archivos aquí o haz clic para subir'}
-                    </p>
-                    <p className="text-slate-600 text-xs">PDF, PNG, JPG hasta 10MB</p>
-                  </div>
-
-                  {attachments.length > 0 && (
-                    <div className="space-y-3">
-                      <p className="text-sm text-slate-400 font-medium">
-                        Archivos adjuntos ({attachments.length})
-                      </p>
-                      {attachments.map((attachment) => {
-                        const FileIcon = getFileIcon(attachment.file_type);
-                        const isImage = attachment.file_type.startsWith('image/');
-                        return (
-                          <motion.div
-                            key={attachment.id}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="p-4 bg-slate-800/50 rounded-xl border border-slate-700/50"
-                          >
-                            {isImage && attachment.previewUrl && (
-                              <div className="mb-3 rounded-lg overflow-hidden">
-                                <img
-                                  src={attachment.previewUrl}
-                                  alt={attachment.file_name}
-                                  className="w-full h-32 object-cover"
-                                />
+                    {/* Files list */}
+                    {attachments.length > 0 && (
+                      <div className="space-y-2">
+                        {attachments.map((attachment) => {
+                          const FileIcon = getFileIcon(attachment.file_type);
+                          return (
+                            <motion.div
+                              key={attachment.id}
+                              initial={{ opacity: 0, y: 5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="flex items-center justify-between p-3 bg-slate-850/60 rounded-xl border border-slate-800"
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <FileIcon className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                                <div className="min-w-0">
+                                  <p className="text-xs text-white font-medium truncate max-w-[180px]">{attachment.file_name}</p>
+                                  {attachment.file_size > 0 && (
+                                    <p className="text-[10px] text-slate-500">{formatFileSize(attachment.file_size)}</p>
+                                  )}
+                                </div>
                               </div>
-                            )}
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 bg-slate-700/50 rounded-lg flex items-center justify-center flex-shrink-0">
-                                <FileIcon className="w-5 h-5 text-emerald-400" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-white text-sm truncate">{attachment.file_name}</p>
-                                <p className="text-slate-500 text-xs">
-                                  {formatFileSize(attachment.file_size)} · {attachment.file_type.split('/')[1]?.toUpperCase()}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                {isImage && (
+                              <div className="flex gap-0.5">
+                                {attachment.previewUrl && (
                                   <button
                                     onClick={() => setPreviewAttachment(attachment)}
-                                    className="p-2 text-slate-400 hover:text-blue-400 transition-colors"
+                                    className="p-1.5 text-slate-400 hover:text-white transition-colors"
                                   >
-                                    <Eye className="w-4 h-4" />
+                                    <Eye className="w-3.5 h-3.5" />
                                   </button>
                                 )}
                                 <button
                                   onClick={() => downloadAttachment(attachment)}
-                                  className="p-2 text-slate-400 hover:text-emerald-400 transition-colors"
+                                  className="p-1.5 text-slate-400 hover:text-white transition-colors"
                                 >
-                                  <Download className="w-4 h-4" />
+                                  <Download className="w-3.5 h-3.5" />
                                 </button>
                                 <button
                                   onClick={() => deleteAttachment(attachment.id)}
-                                  className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+                                  className="p-1.5 text-slate-400 hover:text-red-400 transition-colors"
                                 >
-                                  <Trash2 className="w-4 h-4" />
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </button>
                               </div>
-                            </div>
-                          </motion.div>
-                        );
-                      })}
-                    </div>
-                  )}
+                            </motion.div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-800/50 flex flex-col gap-2">
+            {/* Bottom Actions Bar */}
+            <div className="p-6 border-t border-slate-800/50 flex flex-col gap-2 bg-slate-900">
               <div className="flex gap-2">
                 {onDelete && !transaction.id.startsWith('new_') && (
                   <button
@@ -933,15 +1043,28 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                     <Trash2 className="w-5 h-5" />
                   </button>
                 )}
-                <button
-                  onClick={handleSave}
-                  className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
-                >
-                  <Save className="w-4 h-4" />
-                  Guardar Cambios
-                </button>
+                
+                {isEditing ? (
+                  <button
+                    onClick={handleSave}
+                    className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/15"
+                  >
+                    <Save className="w-4 h-4" />
+                    Guardar Cambios
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setIsEditing(true)}
+                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-750 text-slate-200 font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    Editar Detalles
+                  </button>
+                )}
               </div>
             </div>
+
+            {/* Delete Confirmation Modal overlay */}
             <AnimatePresence>
               {showDeleteConfirm && (
                 <motion.div
@@ -956,7 +1079,7 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                     animate={{ scale: 1, y: 0 }}
                     exit={{ scale: 0.95, y: 10 }}
                     onClick={(e) => e.stopPropagation()}
-                    className="bg-slate-900 border border-red-500/20 p-6 rounded-2xl max-w-sm w-full space-y-4"
+                    className="bg-slate-900 border border-red-500/20 p-6 rounded-2xl max-w-sm w-full space-y-4 shadow-2xl"
                   >
                     <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center mx-auto">
                       <Trash2 className="w-6 h-6 text-red-400" />
@@ -970,7 +1093,7 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                     <div className="flex gap-3">
                       <button
                         onClick={() => setShowDeleteConfirm(false)}
-                        className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-xl transition-colors text-sm"
+                        className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-slate-350 font-semibold rounded-xl transition-colors text-sm"
                       >
                         Cancelar
                       </button>
@@ -980,7 +1103,7 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                           setShowDeleteConfirm(false);
                           onClose();
                         }}
-                        className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors text-sm"
+                        className="flex-1 py-2 bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors text-sm shadow-lg shadow-red-500/10"
                       >
                         Eliminar
                       </button>
@@ -991,6 +1114,7 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
             </AnimatePresence>
           </motion.div>
 
+          {/* Image Preview Overlay */}
           <AnimatePresence>
             {previewAttachment && previewAttachment.previewUrl && (
               <motion.div
@@ -1016,9 +1140,9 @@ export default function SideDrawer({ transaction, isOpen, onClose, onUpdate, onD
                   <img
                     src={previewAttachment.previewUrl}
                     alt={previewAttachment.file_name}
-                    className="max-w-full max-h-[80vh] object-contain rounded-lg"
+                    className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
                   />
-                  <p className="text-white text-sm mt-3 text-center">{previewAttachment.file_name}</p>
+                  <p className="text-white text-sm mt-3 text-center font-medium">{previewAttachment.file_name}</p>
                 </motion.div>
               </motion.div>
             )}
