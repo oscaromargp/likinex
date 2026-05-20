@@ -4,7 +4,12 @@ const today = new Date();
 const currentYear = today.getFullYear();
 const currentMonth = today.getMonth();
 
-const formatDate = (date: Date): string => date.toISOString().split('T')[0];
+const formatDate = (date: Date): string => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
 
 export const userTransactions: Transaction[] = [
   // Pagos Mensuales
@@ -111,20 +116,6 @@ export const userTransactions: Transaction[] = [
     updated_at: '2024-05-14'
   },
   {
-    id: 'usr-8',
-    entity: 'oscaromargp',
-    description: 'Pensión Alimenticia - 1ra Quincena',
-    amount: 4000,
-    due_date: formatDate(new Date(currentYear, currentMonth, 15)),
-    status: 'pending',
-    recurrence: 'monthly',
-    recurrence_day: 15,
-    payment_method: 'transfer',
-    category: 'pension',
-    created_at: '2024-01-01',
-    updated_at: '2024-01-01'
-  },
-  {
     id: 'usr-9',
     entity: 'paypaps',
     description: 'Google Workspace (paypaps.com)',
@@ -198,17 +189,36 @@ export const userTransactions: Transaction[] = [
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
+  // Pensión Alimenticia - Quincenal (días 1 y 15)
   {
-    id: 'usr-14',
+    id: 'usr-14-pension-1',
     entity: 'oscaromargp',
-    description: 'Pensión Alimenticia - 2da Quincena',
+    description: 'Pensión Alimenticia (1a Quincena)',
     amount: 4000,
-    due_date: formatDate(new Date(currentYear, currentMonth + 1, 0)),
+    due_date: formatDate(new Date(currentYear, currentMonth, 1)),
     status: 'pending',
-    recurrence: 'monthly',
-    recurrence_day: 31,
+    recurrence: 'semi_monthly',
+    recurrence_days: [1],
+    tolerance_days: 2,
     payment_method: 'transfer',
     category: 'pension',
+    type: 'expense',
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01'
+  },
+  {
+    id: 'usr-14-pension-2',
+    entity: 'oscaromargp',
+    description: 'Pensión Alimenticia (2a Quincena)',
+    amount: 4000,
+    due_date: formatDate(new Date(currentYear, currentMonth, 15)),
+    status: 'pending',
+    recurrence: 'semi_monthly',
+    recurrence_days: [15],
+    tolerance_days: 2,
+    payment_method: 'transfer',
+    category: 'pension',
+    type: 'expense',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -357,6 +367,52 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 18,
     payment_method: 'card',
     category: 'suscription',
+    type: 'expense',
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01'
+  },
+  {
+    id: 'usr-inc-1',
+    entity: 'tulum',
+    description: 'Ingreso por Renta Vacacional Tulum',
+    amount: 28000,
+    due_date: formatDate(new Date(currentYear, currentMonth, 5)),
+    status: 'settled',
+    recurrence: 'monthly',
+    recurrence_day: 5,
+    payment_method: 'transfer',
+    category: 'renta',
+    type: 'income',
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01'
+  },
+  {
+    id: 'usr-inc-2',
+    entity: 'paypaps',
+    description: 'Ventas Software Licencias SaaS',
+    amount: 14200,
+    due_date: formatDate(new Date(currentYear, currentMonth, 10)),
+    status: 'pending',
+    recurrence: 'monthly',
+    recurrence_day: 10,
+    payment_method: 'transfer',
+    category: 'servicio',
+    type: 'income',
+    created_at: '2024-01-01',
+    updated_at: '2024-01-01'
+  },
+  {
+    id: 'usr-inc-3',
+    entity: 'oscaromargp',
+    description: 'Cobro de Consultoría Mensual',
+    amount: 35000,
+    due_date: formatDate(new Date(currentYear, currentMonth, 15)),
+    status: 'settled',
+    recurrence: 'monthly',
+    recurrence_day: 15,
+    payment_method: 'transfer',
+    category: 'servicio',
+    type: 'income',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   }
@@ -431,6 +487,32 @@ function generateProjections(transaction: Transaction, monthsAhead: number): { d
       while (currentDate <= limitDate) {
         projections.push({ date: formatDate(currentDate) });
         currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+      break;
+    }
+    case 'semi_monthly': {
+      // Genera instancias para los días 1 y 15 de cada mes
+      const targetDays = transaction.recurrence_days || [1, 15];
+      const baseYear = now.getFullYear();
+      const baseMonth = now.getMonth();
+      
+      for (let m = baseMonth; m <= baseMonth + monthsAhead; m++) {
+        const year = baseYear + Math.floor(m / 12);
+        const month = m % 12;
+        
+        for (const day of targetDays) {
+          const daysInMonth = new Date(year, month + 1, 0).getDate();
+          const actualDay = Math.min(day, daysInMonth);
+          const projDate = new Date(year, month, actualDay);
+          
+          // Solo incluir si es futura y no es la fecha base
+          if (projDate > now && projDate >= baseDate && projDate <= limitDate) {
+            // Evitar duplicados con la fecha base
+            if (projDate.getTime() !== baseDate.getTime()) {
+              projections.push({ date: formatDate(projDate) });
+            }
+          }
+        }
       }
       break;
     }

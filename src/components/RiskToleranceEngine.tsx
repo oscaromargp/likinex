@@ -30,7 +30,10 @@ function calculateSmartAlert(transaction: Transaction, today: Date): SmartAlert 
       transaction,
       type: 'overdue',
       label: 'Vencido',
-      severity: 'error'
+      severity: 'error',
+      title: `Pago vencido: ${transaction.description}`,
+      message: `El pago de $${Math.abs(transaction.amount).toLocaleString('es-MX')} venció hace ${Math.abs(diffDays)} día${Math.abs(diffDays) !== 1 ? 's' : ''}`,
+      priority: 'critical'
     };
   }
 
@@ -39,7 +42,10 @@ function calculateSmartAlert(transaction: Transaction, today: Date): SmartAlert 
       transaction,
       type: 'due_today',
       label: 'Vence hoy',
-      severity: 'critical'
+      severity: 'critical',
+      title: `Pago vence hoy: ${transaction.description}`,
+      message: `Tienes un pago de $${Math.abs(transaction.amount).toLocaleString('es-MX')} pendiente para hoy`,
+      priority: 'high'
     };
   }
 
@@ -48,7 +54,10 @@ function calculateSmartAlert(transaction: Transaction, today: Date): SmartAlert 
       transaction,
       type: 'upcoming',
       label: 'Pronto a vencer',
-      severity: 'info'
+      severity: 'info',
+      title: `Próximo pago: ${transaction.description}`,
+      message: `Pago de $${Math.abs(transaction.amount).toLocaleString('es-MX')} vence en ${diffDays} día${diffDays !== 1 ? 's' : ''}`,
+      priority: 'medium'
     };
   }
 
@@ -67,8 +76,8 @@ export function getSmartAlerts(transactions: Transaction[]): SmartAlert[] {
   });
 
   return alerts.sort((a, b) => {
-    const severityOrder = { error: 0, critical: 1, info: 2 };
-    return severityOrder[a.severity] - severityOrder[b.severity];
+    const severityOrder: Record<string, number> = { error: 0, critical: 1, warning: 2, info: 3 };
+    return (severityOrder[a.severity] ?? 3) - (severityOrder[b.severity] ?? 3);
   });
 }
 

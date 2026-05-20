@@ -43,7 +43,7 @@ export const AVAILABLE_COLORS = [
 
 export const COMMON_EMOJIS = ['💼', '🏢', '🏖️', '💻', '🎵', '🚗', '🏭', '🏠', '🏦', '💳', '📊', '🎯', '🔧', '📱', '🌐', '💡', '🚀', '⭐', '🔔', '📦'];
 
-export type RecurrenceType = 'weekly' | 'monthly' | 'bimonthly' | 'quarterly' | 'triennial' | 'yearly' | 'none';
+export type RecurrenceType = 'weekly' | 'monthly' | 'semi_monthly' | 'bimonthly' | 'quarterly' | 'triennial' | 'yearly' | 'none';
 
 export type TransactionStatus = 'pending' | 'partial' | 'settled' | 'cancelled';
 
@@ -110,18 +110,24 @@ export interface Transaction {
   description: string;
   amount: number;
   due_date: string;
+  deadline_date?: string;
+  late_justification?: string;
   paid_date?: string;
   status: TransactionStatus;
   recurrence: RecurrenceType;
   recurrence_day?: number;
+  recurrence_days?: number[];
   payment_method?: PaymentMethod;
   category?: Category;
+  type?: 'income' | 'expense';
   notes?: string;
   follow_up?: string;
   attachment_url?: string;
   price_change?: number;
   contact_id?: string;
   payment_destination?: string;
+  tolerance_days?: number;
+  isProjection?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -165,15 +171,63 @@ export interface Attachment {
   created_at: string;
 }
 
+export interface BankAccount {
+  id?: string;
+  bank_name: string;
+  account_number?: string;
+  clabe?: string;
+  alias?: string;
+  is_primary?: boolean;
+}
+
+export interface PhoneNumber {
+  id?: string;
+  number: string;
+  type: 'casa' | 'trabajo' | 'móvil' | 'otro';
+  description?: string;
+}
+
+export interface Address {
+  id?: string;
+  address: string;
+  type: 'fiscal' | 'entrega' | 'oficina' | 'casa' | 'otro';
+}
+
+export interface DigitalPresence {
+  website?: string;
+  facebook?: string;
+  linkedin?: string;
+  instagram?: string;
+  twitter?: string;
+}
+
+export interface ReputationNote {
+  id: string;
+  date: string;
+  note: string;
+  type: 'positive' | 'negative' | 'neutral';
+  author?: string;
+}
+
 export interface Contact {
   id: string;
   name: string;
-  phone?: string;
   email?: string;
+  // Legacy fields (kept for backward compatibility, mapped to new arrays when needed)
+  phone?: string;
   address?: string;
   bank_name?: string;
   bank_account?: string;
   bank_clabe?: string;
+  
+  // New Enriched Fields
+  bank_accounts?: BankAccount[];
+  phones?: PhoneNumber[];
+  addresses?: Address[];
+  digital_presence?: DigitalPresence;
+  reputation_notes?: ReputationNote[];
+  reputation_score?: number;
+  
   payment_method_preferred?: PaymentMethod;
   notes?: string;
   created_at: string;
@@ -292,6 +346,7 @@ export const STATUS_COLORS: Record<TransactionStatus, string> = {
 export const RECURRENCE_LABELS: Record<RecurrenceType, string> = {
   weekly: 'Semanal',
   monthly: 'Mensual',
+  semi_monthly: 'Quincenal (1 y 15)',
   bimonthly: 'Bimestral',
   quarterly: 'Trimestral',
   triennial: 'Trienal',
@@ -380,8 +435,103 @@ export interface SmartAlert {
   transaction: Transaction;
   type: SmartAlertType;
   label: string;
-  severity: 'info' | 'critical' | 'error';
+  severity: 'info' | 'critical' | 'error' | 'warning';
+  title: string;
+  message: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
 }
+
+export interface Bank {
+  id: string;
+  name: string;
+  shortName: string;
+  clabePrefix: string;
+  logo?: string;
+}
+
+export const BANKS_CATALOG: Bank[] = [
+  { id: 'bbva', name: 'BBVA México', shortName: 'BBVA', clabePrefix: '012', logo: '🏦' },
+  { id: 'banorte', name: 'Banorte', shortName: 'Banorte', clabePrefix: '072', logo: '🔵' },
+  { id: 'santander', name: 'Santander', shortName: 'Santander', clabePrefix: '014', logo: '⚫' },
+  { id: 'citibanamex', name: 'Citibanamex', shortName: 'C@banamex', clabePrefix: '002', logo: '🏛️' },
+  { id: 'hsbc', name: 'HSBC México', shortName: 'HSBC', clabePrefix: '021', logo: '🔴' },
+  { id: 'scotiabank', name: 'Scotiabank Inverlat', shortName: 'Scotiabank', clabePrefix: '044', logo: '💙' },
+  { id: 'bancomer', name: 'Bancomer', shortName: 'Bancomer', clabePrefix: '012', logo: '🏦' },
+  { id: 'banregio', name: 'Banregio', shortName: 'Banregio', clabePrefix: '032', logo: '🟠' },
+  { id: 'inbursa', name: 'Inbursa', shortName: 'Inbursa', clabePrefix: '036', logo: '🟡' },
+  { id: 'azteca', name: 'Banco Azteca', shortName: 'Azteca', clabePrefix: '127', logo: '🟤' },
+  { id: 'coppel', name: 'BanCoppel', shortName: 'Coppel', clabePrefix: '137', logo: '🛒' },
+  { id: 'fondeadora', name: 'Fondeadora', shortName: 'Fondeadora', clabePrefix: '000', logo: '💚' },
+  { id: 'nu', name: 'Nu México', shortName: 'Nu', clabePrefix: '000', logo: '💜' },
+  { id: 'stori', name: 'Stori', shortName: 'Stori', clabePrefix: '000', logo: '💗' },
+  { id: 'klar', name: 'Klar', shortName: 'Klar', clabePrefix: '000', logo: '💎' },
+  { id: 'cash', name: 'Efectivo', shortName: 'Cash', clabePrefix: '', logo: '💵' },
+  { id: 'other', name: 'Otro', shortName: 'Otro', clabePrefix: '', logo: '📋' },
+];
+
+export const PAYMENT_ICONS: Record<PaymentMethod, string> = {
+  transfer: '🏧',
+  cash: '💵',
+  card: '💳',
+  check: '📝',
+  other: '📦'
+};
+
+export const STATUS_ICONS: Record<TransactionStatus, string> = {
+  pending: '⏳',
+  partial: '🔄',
+  settled: '✅',
+  cancelled: '❌'
+};
+
+export interface PaymentReceipt {
+  id: string;
+  transaction_id: string;
+  contact_id?: string;
+  cep: string;
+  amount: number;
+  paid_date: string;
+  method: PaymentMethod;
+  bank_id?: string;
+  reference?: string;
+  notes?: string;
+  created_at: string;
+}
+
+export function generateCEP(transactionId: string, contactId?: string): string {
+  const timestamp = Date.now().toString(36).toUpperCase();
+  const txCode = transactionId.substring(0, 4).toUpperCase();
+  const contactCode = contactId ? contactId.substring(0, 3).toUpperCase() : 'XXX';
+  return `CEP-${txCode}-${contactCode}-${timestamp}`;
+}
+
+export function isIncomeTransaction(tx: Transaction): boolean {
+  if (tx.type === 'income') return true;
+  if (tx.amount < 0) return true;
+  return false;
+}
+
+export function getTransactionAmount(tx: Transaction): { display: number; isIncome: boolean } {
+  const amount = Math.abs(tx.amount);
+  const isIncome = isIncomeTransaction(tx);
+  return { display: amount, isIncome };
+}
+
+export const TYPE_ICONS: Record<'income' | 'expense', string> = {
+  income: '📥',
+  expense: '📤'
+};
+
+export const RECURRENCE_ICONS: Record<RecurrenceType, string> = {
+  none: '➡️',
+  weekly: '🔄',
+  monthly: '📅',
+  semi_monthly: '⚡',
+  bimonthly: '🗓️',
+  quarterly: '📆',
+  triennial: '年度',
+  yearly: '🎆'
+};
 
 export interface User {
   id: string;

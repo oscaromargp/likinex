@@ -2,35 +2,143 @@
 
 import { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
-import { Search, Filter, ArrowUpDown, ChevronDown, ChevronUp, Printer, Paperclip } from 'lucide-react';
-import { Transaction, Entity, TransactionStatus, FilterState, ENTITY_LABELS, ENTITY_COLORS, STATUS_LABELS, STATUS_COLORS, calculatePunctuality, calculateConsecutiveOnTime } from '@/types';
+import { Search, Filter, ArrowUpDown, ChevronDown, ChevronUp, Printer, Paperclip, Eye, EyeOff, Calendar } from 'lucide-react';
+import { 
+  Transaction, 
+  Entity, 
+  TransactionStatus, 
+  FilterState, 
+  ENTITY_LABELS, 
+  ENTITY_COLORS, 
+  STATUS_LABELS, 
+  STATUS_COLORS, 
+  CATEGORY_LABELS,
+  CATEGORY_LABELS as CATEGORIES,
+  RecurrenceType,
+  calculatePunctuality, 
+  calculateConsecutiveOnTime 
+} from '@/types';
 import { formatCurrency, formatDate, isUrgent } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 
 interface LedgerProps {
   transactions: Transaction[];
   onRowClick?: (transaction: Transaction) => void;
-  onPrint?: (dateRange: { start: string | null; end: string | null }, entity: Entity | 'all') => void;
+  onPrint?: (
+    dateRange: { start: string | null; end: string | null },
+    entity: Entity | 'all',
+    category: string | 'all',
+    status: TransactionStatus | 'all',
+    type: 'all' | 'income' | 'expense'
+  ) => void;
   attachmentCounts?: Record<string, number>;
+  categories?: string[];
 }
 
 type SortField = 'description' | 'entity' | 'amount' | 'due_date' | 'status';
 type SortDirection = 'asc' | 'desc';
 
-export default function Ledger({ transactions, onRowClick, onPrint, attachmentCounts = {} }: LedgerProps) {
+const formatDateStr = (date: Date): string => {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
+
+export default function Ledger({ transactions, onRowClick, onPrint, attachmentCounts = {}, categories: customCategories = [] }: LedgerProps) {
   const [filters, setFilters] = useState<FilterState>({
     entity: 'all',
     status: 'all',
     search: '',
     dateRange: { start: null, end: null }
   });
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all');
+  const [showProjections, setShowProjections] = useState<boolean>(true);
+  const [monthsAhead, setMonthsAhead] = useState<number>(2);
+
   const [sortField, setSortField] = useState<SortField>('due_date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [printDateFrom, setPrintDateFrom] = useState('');
   const [printDateTo, setPrintDateTo] = useState('');
 
+  const allCategories = customCategories.length > 0 ? customCategories : Object.keys(CATEGORIES);
+
+  const generateVirtualProjections = (txs: Transaction[]): Transaction[] => {
+    const projected: Transaction[] = [];
+    const now = new Date();
+    const limitDate = new Date(now.getFullYear(), now.getMonth() + monthsAhead + 1, 0);
+
+    txs.forEach(t => {
+      if (t.recurrence && t.recurrence !== 'none' && t.status === 'pending') {
+        let currentDate = new Date(t.due_date);
+        currentDate.setHours(12, 0, 0, 0);
+
+        const addDays = (date: Date, days: number) => {
+          const d = new Date(date);
+          d.setDate(d.getDate() + days);
+          return d;
+        };
+        const addMonths = (date: Date, months: number) => {
+          const d = new Date(date);
+          d.setMonth(d.getMonth() + months);
+          return d;
+        };
+
+        let step = 1;
+        while (true) {
+          if (t.recurrence === 'weekly') {
+            currentDate = addDays(currentDate, 7);
+          } else if (t.recurrence === 'monthly') {
+            currentDate = addMonths(currentDate, 1);
+          } else if (t.recurrence === 'semi_monthly') {
+            const currentDay = currentDate.getDate();
+            const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+            
+            if (currentDay < 15) {
+              currentDate = addDays(currentDate, 15 - currentDay);
+            } else {
+              const nextMonth = addMonths(currentDate, 1);
+              const firstDayOfNextMonth = new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 1);
+              currentDate = firstDayOfNextMonth;
+            }
+          } else if (t.recurrence === 'bimonthly') {
+            currentDate = addMonths(currentDate, 2);
+          } else if (t.recurrence === 'quarterly') {
+            currentDate = addMonths(currentDate, 3);
+          } else if (t.recurrence === 'yearly') {
+            currentDate = addMonths(currentDate, 12);
+          } else {
+            break;
+          }
+
+          if (currentDate > limitDate) break;
+
+          const dateStr = formatDateStr(currentDate);
+          
+          projected.push({
+            ...t,
+            id: `${t.id}-proj-${step}`,
+            due_date: dateStr,
+            status: 'pending',
+            description: `${t.description} (${formatDate(dateStr)})`,
+            isProjection: true
+          } as any);
+          step++;
+          
+          if (step > 24) break;
+        }
+      }
+    });
+
+    return projected;
+  };
+
+  const allTxs = useMemo(() => {
+    if (!showProjections) return transactions;
+    const projected = generateVirtualProjections(transactions);
+    return [...transactions, ...projected];
+  }, [transactions, showProjections, monthsAhead]);
+
   const filteredAndSorted = useMemo(() => {
-    let result = [...transactions];
+    let result = [...allTxs];
 
     if (filters.search) {
       const search = filters.search.toLowerCase();
@@ -48,6 +156,24 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
       result = result.filter(t => t.status === filters.status);
     }
 
+    if (categoryFilter !== 'all') {
+      result = result.filter(t => t.category === categoryFilter);
+    }
+
+    if (typeFilter !== 'all') {
+      result = result.filter(t => {
+        const type = t.type || 'expense';
+        return type === typeFilter;
+      });
+    }
+
+    if (printDateFrom) {
+      result = result.filter(t => t.due_date >= printDateFrom);
+    }
+    if (printDateTo) {
+      result = result.filter(t => t.due_date <= printDateTo);
+    }
+
     result.sort((a, b) => {
       let aVal: string | number = a[sortField];
       let bVal: string | number = b[sortField];
@@ -63,7 +189,7 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
     });
 
     return result;
-  }, [transactions, filters, sortField, sortDirection]);
+  }, [allTxs, filters, categoryFilter, typeFilter, sortField, sortDirection, printDateFrom, printDateTo]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -77,8 +203,21 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
   const handlePrint = () => {
     onPrint?.(
       { start: printDateFrom || null, end: printDateTo || null },
-      filters.entity
+      filters.entity,
+      categoryFilter,
+      filters.status,
+      typeFilter
     );
+  };
+
+  const getTypeLabel = (tx: Transaction) => {
+    if (tx.amount < 0) return 'ingreso';
+    return tx.type === 'income' ? 'ingreso' : 'egreso';
+  };
+
+  const getTypeAmountColor = (tx: Transaction) => {
+    if (tx.amount < 0) return 'text-emerald-400';
+    return tx.type === 'income' ? 'text-emerald-400' : 'text-slate-300';
   };
 
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -87,6 +226,10 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
       ? <ChevronUp className="w-4 h-4 text-emerald-400" />
       : <ChevronDown className="w-4 h-4 text-emerald-400" />;
   };
+
+  const pendingCount = filteredAndSorted.filter(t => t.status === 'pending' && !t.isProjection).length;
+  const settledCount = filteredAndSorted.filter(t => t.status === 'settled' && !t.isProjection).length;
+  const projectionCount = filteredAndSorted.filter(t => t.isProjection).length;
 
   return (
     <div className="bg-slate-900/50 backdrop-blur-xl border border-emerald-500/20 rounded-2xl overflow-hidden">
@@ -98,69 +241,126 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
             </div>
             Libro Mayor
           </h2>
-          <span className="text-slate-400 text-sm">
-            {filteredAndSorted.length} de {transactions.length} transacciones
-          </span>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="px-2 py-1 bg-amber-500/20 text-amber-400 rounded">{pendingCount} Pendientes</span>
+              <span className="px-2 py-1 bg-emerald-500/20 text-emerald-400 rounded">{settledCount} Liquidados</span>
+              {showProjections && projectionCount > 0 && (
+                <span className="px-2 py-1 bg-blue-500/20 text-blue-400 rounded">{projectionCount} Proyecciones</span>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Buscar transacciones..."
-              value={filters.search}
-              onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
-              className="w-full pl-10 pr-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
-            />
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-3">
+            <div className="relative md:col-span-2">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Buscar transacciones..."
+                value={filters.search}
+                onChange={e => setFilters(f => ({ ...f, search: e.target.value }))}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 transition-colors"
+              />
+            </div>
+
+            <select
+              value={filters.entity}
+              onChange={e => setFilters(f => ({ ...f, entity: e.target.value as Entity | 'all' }))}
+              className="px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+            >
+              <option value="all">Todas las entidades</option>
+              {Object.entries(ENTITY_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+
+            <select
+              value={categoryFilter}
+              onChange={e => setCategoryFilter(e.target.value)}
+              className="px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+            >
+              <option value="all">Todas las categorías</option>
+              {allCategories.map(cat => (
+                <option key={cat} value={cat}>{CATEGORY_LABELS[cat as keyof typeof CATEGORY_LABELS] || cat}</option>
+              ))}
+            </select>
+
+            <select
+              value={typeFilter}
+              onChange={e => setTypeFilter(e.target.value as 'all' | 'income' | 'expense')}
+              className="px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+            >
+              <option value="all">Ingresos y Egresos</option>
+              <option value="income">Solo Ingresos</option>
+              <option value="expense">Solo Egresos</option>
+            </select>
+
+            <select
+              value={filters.status}
+              onChange={e => setFilters(f => ({ ...f, status: e.target.value as TransactionStatus | 'all' }))}
+              className="px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+            >
+              <option value="all">Todos los estados</option>
+              {Object.entries(STATUS_LABELS).map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+            </select>
+
+            <select
+              value={monthsAhead}
+              onChange={e => setMonthsAhead(Number(e.target.value))}
+              className="px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
+              title="Meses a proyectar"
+            >
+              <option value={1}>1 mes</option>
+              <option value={2}>2 meses</option>
+              <option value={3}>3 meses</option>
+              <option value={6}>6 meses</option>
+            </select>
           </div>
 
-          <select
-            value={filters.entity}
-            onChange={e => setFilters(f => ({ ...f, entity: e.target.value as Entity | 'all' }))}
-            className="px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
-          >
-            <option value="all">Todas las entidades</option>
-            {Object.entries(ENTITY_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-slate-500" />
+              <span className="text-sm text-slate-400">Rango de fechas:</span>
+              <input
+                type="date"
+                value={printDateFrom}
+                onChange={e => setPrintDateFrom(e.target.value)}
+                className="px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500/50 transition-colors"
+              />
+              <span className="text-slate-500">a</span>
+              <input
+                type="date"
+                value={printDateTo}
+                onChange={e => setPrintDateTo(e.target.value)}
+                className="px-3 py-2 bg-slate-800/50 border border-slate-700/50 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500/50 transition-colors"
+              />
+            </div>
 
-          <select
-            value={filters.status}
-            onChange={e => setFilters(f => ({ ...f, status: e.target.value as TransactionStatus | 'all' }))}
-            className="px-4 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white focus:outline-none focus:border-emerald-500/50 transition-colors"
-          >
-            <option value="all">Todos los estados</option>
-            {Object.entries(STATUS_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
+            <button
+              onClick={() => setShowProjections(!showProjections)}
+              className={cn(
+                'flex items-center gap-2 px-4 py-2 border rounded-xl transition-colors',
+                showProjections 
+                  ? 'bg-blue-500/20 border-blue-500/30 text-blue-400' 
+                  : 'bg-slate-800/50 border-slate-700/50 text-slate-400'
+              )}
+            >
+              {showProjections ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              {showProjections ? 'Ocultar' : 'Mostrar'} Proyecciones
+            </button>
 
-          <div className="flex gap-2">
-            <input
-              type="date"
-              value={printDateFrom}
-              onChange={e => setPrintDateFrom(e.target.value)}
-              placeholder="Desde"
-              className="flex-1 px-3 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500/50 transition-colors"
-            />
-            <input
-              type="date"
-              value={printDateTo}
-              onChange={e => setPrintDateTo(e.target.value)}
-              placeholder="Hasta"
-              className="flex-1 px-3 py-2.5 bg-slate-800/50 border border-slate-700/50 rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500/50 transition-colors"
-            />
+            <button
+              onClick={handlePrint}
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 rounded-xl text-indigo-400 font-medium transition-colors ml-auto"
+            >
+              <Printer className="w-4 h-4" />
+              Imprimir Reporte
+            </button>
           </div>
-
-          <button
-            onClick={handlePrint}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-500/20 hover:bg-indigo-500/30 border border-indigo-500/30 rounded-xl text-indigo-400 font-medium transition-colors"
-          >
-            <Printer className="w-4 h-4" />
-            Imprimir
-          </button>
         </div>
       </div>
 
@@ -183,6 +383,11 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
                 >
                   Entidad <SortIcon field="entity" />
                 </button>
+              </th>
+              <th className="text-left p-4">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Categoría
+                </span>
               </th>
               <th className="text-left p-4">
                 <button
@@ -222,6 +427,10 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
               const consecutiveOnTime = transaction.template_id
                 ? calculateConsecutiveOnTime(transactions, transaction.template_id)
                 : 0;
+              const categoryLabel = transaction.category && CATEGORY_LABELS[transaction.category as keyof typeof CATEGORY_LABELS] 
+                ? CATEGORY_LABELS[transaction.category as keyof typeof CATEGORY_LABELS]
+                : '-';
+              
               return (
                 <motion.tr
                   key={transaction.id}
@@ -231,7 +440,8 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
                   onClick={() => onRowClick?.(transaction)}
                   className={cn(
                     'border-b border-slate-800/30 hover:bg-slate-800/30 transition-colors cursor-pointer',
-                    urgent && 'bg-red-500/5'
+                    urgent && 'bg-red-500/5',
+                    transaction.isProjection && 'bg-blue-500/5'
                   )}
                 >
                   <td className="p-4">
@@ -239,7 +449,15 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
                       {urgent && (
                         <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
                       )}
-                      <span className="text-white font-medium">{transaction.description}</span>
+                      {transaction.isProjection && (
+                        <span className="w-2 h-2 bg-blue-500 rounded-full" title="Proyección" />
+                      )}
+                      <div>
+                        <span className="text-white font-medium block">{transaction.description}</span>
+                        {transaction.isProjection && (
+                          <span className="text-xs text-blue-400">Proyección</span>
+                        )}
+                      </div>
                       {attachmentCounts[transaction.id] > 0 && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full">
                           <Paperclip className="w-3 h-3" />
@@ -254,8 +472,20 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
                     </span>
                   </td>
                   <td className="p-4">
-                    <span className="text-emerald-400 font-semibold">
-                      {formatCurrency(transaction.amount)}
+                    <span className="text-sm text-slate-400">
+                      {categoryLabel}
+                    </span>
+                  </td>
+                  <td className="p-4">
+                    <span className={cn('font-semibold', getTypeAmountColor(transaction))}>
+                      {transaction.amount < 0 ? '+' : '-'}
+                      {formatCurrency(Math.abs(transaction.amount))}
+                    </span>
+                    <span className={cn(
+                      'text-xs ml-1 px-1 py-0.5 rounded',
+                      transaction.amount < 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
+                    )}>
+                      {transaction.amount < 0 ? 'ING' : 'EGR'}
                     </span>
                   </td>
                   <td className="p-4">
@@ -301,6 +531,13 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
           <p className="text-slate-500">No se encontraron transacciones</p>
         </div>
       )}
+
+      <div className="p-4 bg-slate-800/30 border-t border-slate-800/50">
+        <div className="flex items-center justify-between text-sm text-slate-500">
+          <span>{filteredAndSorted.length} transacciones mostradas</span>
+          <span>Total: {formatCurrency(filteredAndSorted.reduce((sum, t) => sum + Math.abs(t.amount), 0))}</span>
+        </div>
+      </div>
     </div>
   );
 }

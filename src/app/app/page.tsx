@@ -13,6 +13,7 @@ import SettingsComponent from '@/components/Settings';
 import CreditCardEngine from '@/components/CreditCardEngine';
 import RiskToleranceEngine from '@/components/RiskToleranceEngine';
 import CashFlowForecast from '@/components/CashFlowForecast';
+import NotificationsPanel from '@/components/NotificationsPanel';
 import Contacts from '@/components/Contacts';
 import { Transaction, CalendarEvent, EntityConfig, DEFAULT_ENTITIES, Contact } from '@/types';
 import { mockCreditCards } from '@/lib/mockData';
@@ -75,49 +76,48 @@ const INITIAL_CONTACTS: Contact[] = [
   {
     id: 'contact_cfe',
     name: 'CFE (Comisión Federal de Electricidad)',
-    phone: '5511223344',
     email: 'pagos@cfe.mx',
-    address: 'Av. Paseo de la Reforma, CDMX',
-    bank_name: 'BBVA Bancomer',
-    bank_clabe: '012180001234567892',
-    bank_account: '0123456789',
+    phones: [{ number: '5511223344', type: 'trabajo', description: 'Atención a clientes' }],
+    addresses: [{ address: 'Av. Paseo de la Reforma, CDMX', type: 'oficina' }],
+    bank_accounts: [{ bank_name: 'BBVA Bancomer', account_number: '0123456789', clabe: '012180001234567892', is_primary: true }],
     payment_method_preferred: 'transfer',
     notes: 'Pago de electricidad bimestral. Variable.',
+    digital_presence: { website: 'https://www.cfe.mx' },
+    reputation_notes: [{ id: 'rep_cfe_1', date: new Date().toISOString(), type: 'neutral', note: 'Siempre facturan a tiempo.' }],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   },
   {
     id: 'contact_telmex',
     name: 'Telmex (Servicios de Internet)',
-    phone: '8001232222',
     email: 'factura@telmex.com',
-    address: 'Av. Marina Nacional, CDMX',
-    bank_name: 'Santander',
-    bank_clabe: '014180009876543210',
-    bank_account: '987654321',
+    phones: [{ number: '8001232222', type: 'trabajo', description: 'Soporte Técnico' }],
+    addresses: [{ address: 'Av. Marina Nacional, CDMX', type: 'oficina' }],
+    bank_accounts: [{ bank_name: 'Santander', account_number: '987654321', clabe: '014180009876543210', is_primary: true }],
     payment_method_preferred: 'card',
     notes: 'Pago mensual de internet y telefonía. Fijo.',
+    digital_presence: { website: 'https://telmex.com', facebook: 'https://facebook.com/telmex' },
+    reputation_notes: [{ id: 'rep_telmex_1', date: new Date().toISOString(), type: 'negative', note: 'Tardaron 3 días en arreglar un problema de conexión el mes pasado.' }],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   },
   {
     id: 'contact_limpieza',
     name: 'Doña María (Servicio de Limpieza)',
-    phone: '5599887766',
-    bank_name: 'BanCoppel',
-    bank_clabe: '137180004561237890',
+    phones: [{ number: '5599887766', type: 'móvil', description: 'Personal' }],
+    bank_accounts: [{ bank_name: 'BanCoppel', clabe: '137180004561237890', is_primary: true }],
     payment_method_preferred: 'cash',
     notes: 'Limpieza los días 15 y 30. Se paga en efectivo o transferencia.',
+    reputation_notes: [{ id: 'rep_maria_1', date: new Date().toISOString(), type: 'positive', note: 'Muy confiable y puntual.' }],
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   },
   {
     id: 'contact_renta',
     name: 'Arrendadora Centenario (Renta Oficina)',
-    phone: '5566778899',
     email: 'rentas@centenario.com',
-    bank_name: 'Banorte',
-    bank_clabe: '072180002581473695',
+    phones: [{ number: '5566778899', type: 'trabajo', description: 'Administración' }, { number: '5566778800', type: 'móvil', description: 'Urgencias' }],
+    bank_accounts: [{ bank_name: 'Banorte', clabe: '072180002581473695', is_primary: true, alias: 'Cuenta Fiscal' }],
     payment_method_preferred: 'transfer',
     notes: 'Renta mensual de la oficina principal. Límite el día 5.',
     created_at: new Date().toISOString(),
@@ -135,6 +135,7 @@ function DashboardContent() {
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showPDFReport, setShowPDFReport] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [printFilters, setPrintFilters] = useState({ dateRange: { start: null as string | null, end: null as string | null }, entity: 'all' as any });
 
   // Estados locales para el modo Demo interactivo
@@ -648,7 +649,7 @@ function DashboardContent() {
               <h2 className="text-lg font-semibold text-[var(--text-primary)] capitalize">{activeView}</h2>
             </div>
             <div className="flex items-center gap-4">
-              <button className="p-2 rounded-xl bg-[var(--bg-tertiary)]/50 hover:bg-[var(--bg-tertiary)] transition-colors relative">
+              <button onClick={() => setShowNotifications(!showNotifications)} className="p-2 rounded-xl bg-[var(--bg-tertiary)]/50 hover:bg-[var(--bg-tertiary)] transition-colors relative">
                 <Bell className="w-5 h-5 text-[var(--text-muted)]" />
                 {alertCount > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
@@ -667,6 +668,10 @@ function DashboardContent() {
               )}
             </div>
           </header>
+
+          {showNotifications && (
+            <NotificationsPanel alerts={smartAlerts} onClose={() => setShowNotifications(false)} />
+          )}
 
           <div className="p-8">
             {activeView === 'dashboard' && (
@@ -758,7 +763,7 @@ function DashboardContent() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <Ledger transactions={transactions} onRowClick={handleTransactionClick} onPrint={handlePrint} attachmentCounts={attachmentCounts} />
+                <Ledger transactions={transactions} onRowClick={handleTransactionClick} onPrint={handlePrint} attachmentCounts={attachmentCounts} categories={categories} />
               </motion.div>
             )}
 
@@ -809,6 +814,7 @@ function DashboardContent() {
         allTransactions={transactions}
         entities={entities}
         contacts={contacts}
+        categories={categories}
       />
 
       <PDFReport

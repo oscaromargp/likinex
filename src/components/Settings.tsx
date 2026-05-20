@@ -2,8 +2,8 @@
 
 import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Upload, Download, Plus, Trash2, FileText, Check, AlertCircle, Moon, Sun, Monitor } from 'lucide-react';
-import { Transaction, Entity, RecurrenceType, CATEGORY_LABELS, ENTITY_LABELS, EntityConfig, DEFAULT_ENTITIES, ENTITY_COLORS_MAP, AVAILABLE_COLORS, COMMON_EMOJIS } from '@/types';
+import { Upload, Download, Plus, Trash2, FileText, Check, AlertCircle, Moon, Sun, Monitor, FileSpreadsheet, Eye, Table } from 'lucide-react';
+import { Transaction, Entity, RecurrenceType, CATEGORY_LABELS, ENTITY_LABELS, EntityConfig, DEFAULT_ENTITIES, ENTITY_COLORS_MAP, AVAILABLE_COLORS, COMMON_EMOJIS, STATUS_LABELS } from '@/types';
 import { formatCurrency } from '@/lib/utils';
 import { Theme, useTheme } from '@/hooks/useTheme';
 
@@ -19,6 +19,25 @@ interface SettingsProps {
   onUpdateEntity: (entity: EntityConfig) => void;
   onDeleteEntity: (id: string) => void;
 }
+
+const TEMPLATE_CSV = `entity,description,amount,due_date,status,recurrence,category,type,notes,bank
+oscaromargp,Pensión Alimenticia 1a Quincena,4000,2026-06-01,pending,semi_monthly,pension,expense,Pago puntual favor,banorte
+oscaromargp,Pensión Alimenticia 2a Quincena,4000,2026-06-15,pending,semi_monthly,pension,expense,Pago puntual favor,banorte
+tulum,Renta Vacacional Tulum,28000,2026-06-05,settled,monthly,renta,income,Depósito mensual,-6500
+oscaromargp,Renta Oficina Principal,7500,2026-06-24,pending,monthly,renta,expense,Transferir a Bancomer,bancomer`;
+
+const TEMPLATE_COLUMNS = [
+  { name: 'entity', desc: 'Identificador de la entidad', example: 'oscaromargp, tulum, paypaps' },
+  { name: 'description', desc: 'Descripción del pago', example: 'Renta, CFE, Pensión' },
+  { name: 'amount', desc: 'Monto (positivo=egreso, negativo=ingreso)', example: '4000 o -28000' },
+  { name: 'due_date', desc: 'Fecha de vencimiento (YYYY-MM-DD)', example: '2026-06-15' },
+  { name: 'status', desc: 'Estado: pending, settled, partial, cancelled', example: 'pending' },
+  { name: 'recurrence', desc: 'Recurrencia: none, weekly, monthly, semi_monthly, bimonthly, quarterly, yearly', example: 'monthly' },
+  { name: 'category', desc: 'Categoría: pension, renta, telefonia, etc.', example: 'pension' },
+  { name: 'type', desc: 'Tipo: income o expense', example: 'expense' },
+  { name: 'notes', desc: 'Notas opcionales', example: 'Pago puntual' },
+  { name: 'bank', desc: 'Banco destino (opcional)', example: 'banorte, bbva' },
+];
 
 export default function Settings({ 
   transactions, 
@@ -41,6 +60,8 @@ export default function Settings({
   const [newEntityIcon, setNewEntityIcon] = useState('💼');
   const [newEntityColor, setNewEntityColor] = useState('emerald');
   const [editingEntity, setEditingEntity] = useState<EntityConfig | null>(null);
+  const [showTemplateGuide, setShowTemplateGuide] = useState(false);
+  const [previewData, setPreviewData] = useState<string[][]>([]);
 
   const themeOptions: { id: Theme; label: string; icon: typeof Moon; description: string }[] = [
     { id: 'dark', label: 'Oscuro', icon: Moon, description: 'Tema oscuro' },
@@ -56,38 +77,59 @@ export default function Settings({
     reader.onload = (e) => {
       try {
         const text = e.target?.result as string;
-        const lines = text.split('\n');
-        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        const lines = text.split('\n').filter(l => l.trim());
         
+        if (lines.length < 2) {
+          setImportStatus({ type: 'error', message: 'El archivo debe tener encabezados y al menos una fila de datos.' });
+          return;
+        }
+
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
         const importedTransactions: Partial<Transaction>[] = [];
+        const previewRows: string[][] = [headers];
         
         for (let i = 1; i < lines.length; i++) {
           const line = lines[i].trim();
           if (!line) continue;
           
-          const values = line.split(',').map(v => v.trim());
+          const values = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(v => v.trim().replace(/^"|"$/g, ''));
+          
+          if (values.length >= headers.length) {
+            previewRows.push(values);
+          }
+          
           const row: Record<string, string> = {};
           headers.forEach((header, idx) => {
             row[header] = values[idx] || '';
           });
           
           if (row.description && row.amount) {
+            const amount = parseFloat(row.amount) || 0;
             importedTransactions.push({
               entity: (row.entity as Entity) || 'oscaromargp',
               description: row.description,
-              amount: parseFloat(row.amount) || 0,
+              amount: amount,
               due_date: row.due_date || new Date().toISOString().split('T')[0],
               status: (row.status as Transaction['status']) || 'pending',
-              recurrence: (row.recurrence as RecurrenceType) || 'monthly',
-              notes: row.notes || ''
+              recurrence: (row.recurrence as RecurrenceType) || 'none',
+              category: (row.category as any) || undefined,
+              type: (row.type as 'income' | 'expense') || (amount < 0 ? 'income' : 'expense'),
+              notes: row.notes || '',
+              payment_destination: row.bank || undefined,
             });
           }
         }
         
-        onImport(importedTransactions);
-        setImportStatus({ type: 'success', message: `Se importaron ${importedTransactions.length} transacciones exitosamente` });
+        setPreviewData(previewRows.slice(0, 6));
+        
+        if (importedTransactions.length > 0) {
+          onImport(importedTransactions);
+          setImportStatus({ type: 'success', message: `Se importaron ${importedTransactions.length} transacciones exitosamente` });
+        } else {
+          setImportStatus({ type: 'error', message: 'No se encontraron transacciones válidas. Revisa el formato.' });
+        }
       } catch (error) {
-        setImportStatus({ type: 'error', message: 'Error al procesar el archivo. Asegúrate de que el formato sea correcto.' });
+        setImportStatus({ type: 'error', message: 'Error al procesar el archivo. Asegúrate de que el formato CSV sea correcto.' });
       }
     };
     reader.readAsText(file);
@@ -97,13 +139,13 @@ export default function Settings({
     }
   };
 
-  const downloadTemplate = () => {
-    const template = 'entity,description,amount,due_date,recurrence,status,notes\noscaromargp,Ejemplo de pago,1000.00,2026-06-15,monthly,pending,Notas opcionales';
+  const downloadTemplate = (withExamples: boolean = true) => {
+    const template = withExamples ? TEMPLATE_CSV : 'entity,description,amount,due_date,status,recurrence,category,type,notes,bank';
     const blob = new Blob([template], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'plantilla_likinex.csv';
+    a.download = withExamples ? 'plantilla_likinex_ejemplos.csv' : 'plantilla_likinex_vacia.csv';
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -207,19 +249,94 @@ export default function Settings({
           <div className="space-y-3">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors"
+              className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
             >
+              <FileSpreadsheet className="w-5 h-5" />
               Seleccionar Archivo CSV
             </button>
             
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => downloadTemplate(true)}
+                className="py-2.5 px-3 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
+              >
+                <Download className="w-4 h-4" />
+                Con Ejemplos
+              </button>
+              <button
+                onClick={() => downloadTemplate(false)}
+                className="py-2.5 px-3 border border-slate-700 text-slate-300 hover:bg-slate-800/50 font-medium rounded-xl transition-colors flex items-center justify-center gap-2 text-sm"
+              >
+                <Download className="w-4 h-4" />
+                Vacía
+              </button>
+            </div>
+            
             <button
-              onClick={downloadTemplate}
-              className="w-full py-3 px-4 border border-slate-700 text-slate-300 hover:bg-slate-800/50 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+              onClick={() => setShowTemplateGuide(!showTemplateGuide)}
+              className="w-full py-2.5 px-4 border border-slate-700 text-slate-400 hover:bg-slate-800/50 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
             >
-              <Download className="w-4 h-4" />
-              Descargar Plantilla
+              <Eye className="w-4 h-4" />
+              {showTemplateGuide ? 'Ocultar' : 'Ver'} Guía de Plantilla
             </button>
           </div>
+
+          {showTemplateGuide && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mt-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50"
+            >
+              <h5 className="text-sm font-semibold text-emerald-400 mb-3 flex items-center gap-2">
+                <Table className="w-4 h-4" />
+                Columnas de la Plantilla
+              </h5>
+              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {TEMPLATE_COLUMNS.map((col, idx) => (
+                  <div key={idx} className="flex items-start gap-3 p-2 bg-slate-900/50 rounded-lg">
+                    <code className="text-blue-400 text-xs font-mono min-w-[100px]">{col.name}</code>
+                    <div className="flex-1">
+                      <p className="text-slate-300 text-xs">{col.desc}</p>
+                      <p className="text-slate-500 text-[10px] mt-0.5">Ej: {col.example}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {previewData.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="mt-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700/50"
+            >
+              <h5 className="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                Vista Previa ({previewData.length - 1} registros)
+              </h5>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-700">
+                      {previewData[0].map((h, i) => (
+                        <th key={i} className="text-left p-2 text-slate-400 font-medium">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {previewData.slice(1).map((row, i) => (
+                      <tr key={i} className="border-b border-slate-800/50">
+                        {row.map((cell, j) => (
+                          <td key={j} className="p-2 text-slate-300 truncate max-w-[100px]">{cell}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
+          )}
 
           {importStatus && (
             <motion.div

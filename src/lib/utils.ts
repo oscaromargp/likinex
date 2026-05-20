@@ -53,3 +53,77 @@ export function getDaysInMonth(year: number, month: number): number {
 export function getFirstDayOfMonth(year: number, month: number): number {
   return new Date(year, month, 1).getDay();
 }
+
+export function calculateDaysLate(dueDate: string, paidDate?: string | null): number {
+  if (!paidDate) return 0;
+  const due = new Date(dueDate);
+  due.setHours(0, 0, 0, 0);
+  const paid = new Date(paidDate);
+  paid.setHours(0, 0, 0, 0);
+  const diffMs = paid.getTime() - due.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+}
+
+export function getTransactionStatusFromPayments(
+  amount: number,
+  totalPaid: number
+): 'pending' | 'partial' | 'settled' {
+  if (totalPaid >= amount) return 'settled';
+  if (totalPaid > 0) return 'partial';
+  return 'pending';
+}
+
+export function getPeriodKey(date: Date): { month: number; year: number } {
+  return {
+    month: date.getMonth() + 1,
+    year: date.getFullYear()
+  };
+}
+
+export function generateRecurrenceDates(
+  startDate: string,
+  recurrence: string,
+  count: number = 12
+): string[] {
+  const dates: string[] = [];
+  const start = new Date(startDate);
+  
+  for (let i = 0; i < count; i++) {
+    const next = new Date(start);
+    switch (recurrence) {
+      case 'weekly':
+        next.setDate(next.getDate() + (i * 7));
+        break;
+      case 'monthly':
+        next.setMonth(next.getMonth() + i);
+        break;
+      case 'bimonthly':
+        next.setMonth(next.getMonth() + (i * 2));
+        break;
+      case 'quarterly':
+        next.setMonth(next.getMonth() + (i * 3));
+        break;
+      case 'triennial':
+        next.setFullYear(next.getFullYear() + (i * 3));
+        break;
+      case 'yearly':
+        next.setFullYear(next.getFullYear() + i);
+        break;
+      default:
+        if (i === 0) dates.push(startDate);
+        return dates;
+    }
+    dates.push(next.toISOString().split('T')[0]);
+  }
+  
+  return dates;
+}
+
+export function isBudgetExceeded(spent: number, budget: number): boolean {
+  return spent > budget;
+}
+
+export function getBudgetPercentage(spent: number, budget: number): number {
+  if (budget === 0) return 0;
+  return Math.round((spent / budget) * 100);
+}

@@ -45,6 +45,8 @@
 | **Métricas en Tiempo Real** | Cálculo de Committed vs. Settled cash flow y runway de caja |
 | **Seguridad por Entidades** | 7 cuentas segregadas con seguimiento individual |
 | **Drawer de Gestión** | Seguimiento de follow-ups, pagos, adjuntos y cambios de precio |
+| **Comprobantes Electrónicos** | Generación de CEP (Comprobante Electrónico de Pago) en PDF con desglose de amortizaciones parciales |
+| **Contactos Enriquecidos** | Perfiles detallados con múltiples bancos, direcciones, teléfonos, reputación e histórico de operaciones |
 
 ### 🔄 Tipos de Recurrencia
 

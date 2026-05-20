@@ -2,10 +2,11 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, DollarSign, FileText, Clock, CreditCard, Paperclip, Save, Upload, Trash2, Eye, Download, Image as ImageIcon, Edit3, Plus, History, Landmark, Check, Copy, User } from 'lucide-react';
-import { Transaction, TransactionStatus, PaymentMethod, RecurrenceType, Contact, ENTITY_LABELS, STATUS_LABELS, Currency, CURRENCY_SYMBOLS, convertCurrency, calculatePunctuality, calculateConsecutiveOnTime, getScoreLabel, Attachment, EntityConfig, DEFAULT_ENTITIES, getEntityIcon, getEntityLabel, CATEGORY_LABELS, Category } from '@/types';
+import { X, Calendar, DollarSign, FileText, Clock, CreditCard, Paperclip, Save, Upload, Trash2, Eye, Download, Image as ImageIcon, Edit3, Plus, History, Landmark, Check, Copy, User, Search, ChevronDown } from 'lucide-react';
+import { Transaction, TransactionStatus, PaymentMethod, RecurrenceType, Contact, ENTITY_LABELS, STATUS_LABELS, Currency, CURRENCY_SYMBOLS, convertCurrency, calculatePunctuality, calculateConsecutiveOnTime, getScoreLabel, Attachment, EntityConfig, DEFAULT_ENTITIES, getEntityIcon, getEntityLabel, CATEGORY_LABELS, Category, BANKS_CATALOG, Bank, PAYMENT_ICONS, STATUS_ICONS, TYPE_ICONS, RECURRENCE_ICONS } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
+import RecurrenceModal from './RecurrenceModal';
 
 const CURRENCIES: Currency[] = ['MXN', 'USD', 'BTC', 'ETH', 'USDT'];
 const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string }[] = [
@@ -16,14 +17,15 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string }[] =
   { value: 'other', label: 'Otro', icon: '📦' },
 ];
 
-const RECURRENCE_OPTIONS: { value: RecurrenceType; label: string }[] = [
-  { value: 'none', label: 'Sin recurrencia' },
-  { value: 'weekly', label: 'Semanal' },
-  { value: 'monthly', label: 'Mensual' },
-  { value: 'bimonthly', label: 'Bimestral' },
-  { value: 'quarterly', label: 'Trimestral' },
-  { value: 'yearly', label: 'Anual' },
-  { value: 'triennial', label: 'Trienal' }
+const RECURRENCE_OPTIONS: { value: RecurrenceType; label: string; icon: string }[] = [
+  { value: 'none', label: 'Sin recurrencia', icon: '➡️' },
+  { value: 'weekly', label: 'Semanal', icon: '🔄' },
+  { value: 'monthly', label: 'Mensual', icon: '📅' },
+  { value: 'semi_monthly', label: 'Quincenal (1 y 15)', icon: '⚡' },
+  { value: 'bimonthly', label: 'Bimestral', icon: '🗓️' },
+  { value: 'quarterly', label: 'Trimestral', icon: '📆' },
+  { value: 'yearly', label: 'Anual', icon: '🎆' },
+  { value: 'triennial', label: 'Trienal', icon: '📅' }
 ];
 
 const getFileIcon = (type: string) => {
@@ -44,11 +46,12 @@ interface SideDrawerProps {
   transaction: Transaction | null;
   isOpen: boolean;
   onClose: () => void;
-  onUpdate?: (transaction: Transaction | Transaction[]) => void;
-  onDelete?: (id: string) => void;
+  onUpdate: (updated: Transaction | Transaction[]) => Promise<void>;
+  onDelete: (id: string) => Promise<void>;
   allTransactions?: Transaction[];
   entities?: EntityConfig[];
   contacts?: Contact[];
+  categories?: string[];
 }
 
 interface AttachmentWithPreview extends Attachment {
@@ -73,7 +76,8 @@ export default function SideDrawer({
   onDelete,
   allTransactions = [],
   entities = [],
-  contacts = []
+  contacts = [],
+  categories = []
 }: SideDrawerProps) {
   const [activeTab, setActiveTab] = useState<'details' | 'execution'>('details');
   const [isEditing, setIsEditing] = useState(false);
@@ -94,7 +98,13 @@ export default function SideDrawer({
     msiMonths: 12,
     contact_id: '',
     payment_destination: '',
-    recurrence: 'none' as RecurrenceType
+    recurrence: 'none' as RecurrenceType,
+    recurrence_days: [1, 15] as number[],
+    type: 'expense' as 'income' | 'expense',
+    tolerance_days: 2 as number,
+    bank_id: '' as string,
+    deadline_date: '',
+    late_justification: ''
   });
   
   const [attachments, setAttachments] = useState<AttachmentWithPreview[]>([]);
@@ -109,6 +119,9 @@ export default function SideDrawer({
     date: new Date().toISOString().split('T')[0],
     notes: ''
   });
+  
+  const [showRecurrenceModal, setShowRecurrenceModal] = useState(false);
+  const [pendingDateChange, setPendingDateChange] = useState<{ newDate: string; originalDate: string } | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -130,7 +143,13 @@ export default function SideDrawer({
         msiMonths: 12,
         contact_id: transaction.contact_id || '',
         payment_destination: transaction.payment_destination || '',
-        recurrence: transaction.recurrence || 'none'
+        recurrence: transaction.recurrence || 'none',
+        recurrence_days: (transaction as any).recurrence_days || [1, 15],
+        type: transaction.type || 'expense',
+        tolerance_days: transaction.tolerance_days ?? 2,
+        bank_id: (transaction as any).bank_id || '',
+        deadline_date: transaction.deadline_date || '',
+        late_justification: transaction.late_justification || ''
       });
       setIsEditing(transaction.id.startsWith('new_'));
       setShowDeleteConfirm(false);
@@ -255,16 +274,32 @@ export default function SideDrawer({
     ? calculateConsecutiveOnTime(allTransactions, transaction.template_id)
     : 0;
 
-  const handleSave = () => {
+const handleSave = () => {
     const totalPaid = paymentRecords.reduce((sum, r) => sum + r.amount, 0);
-    const isSettled = editForm.amount > 0 ? (totalPaid >= editForm.amount) : (totalPaid > 0);
-    const calculatedStatus: TransactionStatus = isSettled ? 'settled' : (totalPaid > 0 ? 'partial' : 'pending');
+    const absAmount = Math.abs(editForm.amount);
+    const isIncome = editForm.amount < 0;
+    
+    let calculatedStatus: TransactionStatus = 'pending';
+    
+    if (isIncome) {
+      calculatedStatus = 'settled';
+    } else {
+      if (absAmount > 0) {
+        calculatedStatus = totalPaid >= absAmount ? 'settled' : (totalPaid > 0 ? 'partial' : 'pending');
+      } else {
+        calculatedStatus = 'settled';
+      }
+    }
+    
     const attachmentUrls = attachments.map(a => a.base64 || a.file_path).join(',');
+    const originalDate = transaction.due_date;
+    const hasDateChanged = editForm.due_date !== originalDate;
+    const isRecurring = transaction.template_id || (transaction.recurrence && transaction.recurrence !== 'none');
 
     if (onUpdate) {
       if (editForm.isMsi && transaction.id.startsWith('new_')) {
         const msiCount = editForm.msiMonths;
-        const installmentAmount = Math.round((editForm.amount / msiCount) * 100) / 100;
+        const installmentAmount = Math.round((absAmount / msiCount) * 100) / 100;
         const installments: Transaction[] = [];
         
         for (let i = 0; i < msiCount; i++) {
@@ -288,35 +323,188 @@ export default function SideDrawer({
             status: 'pending',
             contact_id: editForm.contact_id || undefined,
             payment_destination: editForm.payment_destination || undefined,
-            recurrence: 'none'
+            recurrence: 'none',
+            type: editForm.type,
+            deadline_date: editForm.deadline_date || undefined,
+            late_justification: editForm.late_justification || undefined
           });
         }
         onUpdate(installments);
+      } else if (hasDateChanged && isRecurring && !transaction.id.startsWith('new_')) {
+        const futureCount = countFutureOccurrences(transaction, allTransactions, editForm.due_date);
+        if (futureCount > 0) {
+          setPendingDateChange({ newDate: editForm.due_date, originalDate });
+          setShowRecurrenceModal(true);
+          return;
+        }
+        performUpdate(editForm.due_date, 'single', attachmentUrls, calculatedStatus, isIncome);
       } else {
-        onUpdate({
-          ...transaction,
-          description: editForm.description,
-          amount: editForm.amount,
-          due_date: editForm.due_date,
-          entity: editForm.entity || transaction.entity,
-          category: (editForm.category as Category) || undefined,
-          notes: editForm.notes || undefined,
-          payment_method: (editForm.payment_method as PaymentMethod) || undefined,
-          follow_up: editForm.follow_up || undefined,
-          price_change: editForm.price_change || undefined,
-          attachment_url: attachmentUrls || undefined,
-          status: calculatedStatus,
-          contact_id: editForm.contact_id || undefined,
-          payment_destination: editForm.payment_destination || undefined,
-          recurrence: editForm.recurrence || 'none',
-          paid_date: isSettled 
-            ? (paymentRecords[paymentRecords.length - 1]?.date || new Date().toISOString().split('T')[0]) 
-            : undefined
-        });
+        performUpdate(editForm.due_date, 'single', attachmentUrls, calculatedStatus, isIncome);
       }
     }
     setIsEditing(false);
-    onClose();
+  };
+
+  const countFutureOccurrences = (
+    tx: Transaction, 
+    allTxs: Transaction[], 
+    newDate: string
+  ): number => {
+    if (!tx.template_id) return 0;
+    
+    return allTxs.filter(t => 
+      t.template_id === tx.template_id && 
+      t.id !== tx.id &&
+      new Date(t.due_date) > new Date(tx.due_date)
+    ).length;
+  };
+
+  const findFutureOccurrences = (
+    tx: Transaction, 
+    allTxs: Transaction[]
+  ): Transaction[] => {
+    if (!tx.template_id) return [];
+    return allTxs.filter(t => 
+      t.template_id === tx.template_id && 
+      t.id !== tx.id &&
+      new Date(t.due_date) > new Date(tx.due_date)
+    ).sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+  };
+
+  const calculateNewDates = (
+    tx: Transaction, 
+    originalDate: string, 
+    newDate: string
+  ): string => {
+    const orig = new Date(originalDate);
+    const target = new Date(newDate);
+    const diffTime = target.getTime() - orig.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    
+    const newDueDate = new Date(tx.due_date);
+    newDueDate.setDate(newDueDate.getDate() + diffDays);
+    return newDueDate.toISOString().split('T')[0];
+  };
+
+  const performUpdate = (
+    dueDate: string,
+    mode: 'single' | 'all',
+    attachmentUrls: string,
+    calculatedStatus: TransactionStatus,
+    isIncome: boolean
+  ) => {
+    if (!onUpdate) return;
+
+    if (mode === 'all' && transaction.template_id) {
+      const futureTxs = findFutureOccurrences(transaction, allTransactions);
+      const updatedTxs = futureTxs.map(t => ({
+        ...t,
+        due_date: calculateNewDates(t, transaction.due_date, dueDate),
+        attachment_url: attachmentUrls || t.attachment_url,
+        updated_at: new Date().toISOString()
+      }));
+      
+      const mainTx = {
+        ...transaction,
+        description: editForm.description,
+        amount: editForm.amount,
+        due_date: dueDate,
+        entity: editForm.entity || transaction.entity,
+        category: (editForm.category as Category) || undefined,
+        notes: editForm.notes || undefined,
+        payment_method: (editForm.payment_method as PaymentMethod) || undefined,
+        follow_up: editForm.follow_up || undefined,
+        price_change: editForm.price_change || undefined,
+        attachment_url: attachmentUrls || undefined,
+        status: calculatedStatus,
+        contact_id: editForm.contact_id || undefined,
+        payment_destination: editForm.payment_destination || undefined,
+        recurrence: editForm.recurrence || 'none',
+        type: editForm.type,
+        deadline_date: editForm.deadline_date || undefined,
+        late_justification: editForm.late_justification || undefined,
+        paid_date: calculatedStatus === 'settled' 
+          ? (isIncome ? dueDate : paymentRecords[paymentRecords.length - 1]?.date || new Date().toISOString().split('T')[0]) 
+          : undefined
+      };
+      onUpdate([mainTx, ...updatedTxs]);
+    } else {
+      onUpdate({
+        ...transaction,
+        description: editForm.description,
+        amount: editForm.amount,
+        due_date: dueDate,
+        entity: editForm.entity || transaction.entity,
+        category: (editForm.category as Category) || undefined,
+        notes: editForm.notes || undefined,
+        payment_method: (editForm.payment_method as PaymentMethod) || undefined,
+        follow_up: editForm.follow_up || undefined,
+        price_change: editForm.price_change || undefined,
+        attachment_url: attachmentUrls || undefined,
+        status: calculatedStatus,
+        contact_id: editForm.contact_id || undefined,
+        payment_destination: editForm.payment_destination || undefined,
+        recurrence: editForm.recurrence || 'none',
+        type: editForm.type,
+        deadline_date: editForm.deadline_date || undefined,
+        late_justification: editForm.late_justification || undefined,
+        paid_date: calculatedStatus === 'settled' 
+          ? (isIncome ? dueDate : paymentRecords[paymentRecords.length - 1]?.date || new Date().toISOString().split('T')[0]) 
+          : undefined
+      });
+    }
+  };
+
+  const handleRecurrenceUpdateThis = () => {
+    if (!pendingDateChange) return;
+    const totalPaid = paymentRecords.reduce((sum, r) => sum + r.amount, 0);
+    const absAmount = Math.abs(editForm.amount);
+    const isIncome = editForm.amount < 0;
+    
+    let calculatedStatus: TransactionStatus = 'pending';
+    if (isIncome) {
+      calculatedStatus = 'settled';
+    } else if (absAmount > 0) {
+      calculatedStatus = totalPaid >= absAmount ? 'settled' : (totalPaid > 0 ? 'partial' : 'pending');
+    } else {
+      calculatedStatus = 'settled';
+    }
+    
+    const attachmentUrls = attachments.map(a => a.base64 || a.file_path).join(',');
+    performUpdate(pendingDateChange.newDate, 'single', attachmentUrls, calculatedStatus, isIncome);
+    setShowRecurrenceModal(false);
+    setPendingDateChange(null);
+    setIsEditing(false);
+  };
+
+  const handleRecurrenceUpdateAll = () => {
+    if (!pendingDateChange) return;
+    const totalPaid = paymentRecords.reduce((sum, r) => sum + r.amount, 0);
+    const absAmount = Math.abs(editForm.amount);
+    const isIncome = editForm.amount < 0;
+    
+    let calculatedStatus: TransactionStatus = 'pending';
+    if (isIncome) {
+      calculatedStatus = 'settled';
+    } else if (absAmount > 0) {
+      calculatedStatus = totalPaid >= absAmount ? 'settled' : (totalPaid > 0 ? 'partial' : 'pending');
+    } else {
+      calculatedStatus = 'settled';
+    }
+    
+    const attachmentUrls = attachments.map(a => a.base64 || a.file_path).join(',');
+    performUpdate(pendingDateChange.newDate, 'all', attachmentUrls, calculatedStatus, isIncome);
+    setShowRecurrenceModal(false);
+    setPendingDateChange(null);
+    setIsEditing(false);
+  };
+
+  const handleRecurrenceCancel = () => {
+    if (pendingDateChange) {
+      setEditForm(f => ({ ...f, due_date: pendingDateChange.originalDate }));
+    }
+    setShowRecurrenceModal(false);
+    setPendingDateChange(null);
   };
 
   const processFile = (file: File) => {
@@ -485,6 +673,46 @@ export default function SideDrawer({
               {/* TAB 1: DETAILS */}
               {activeTab === 'details' && (
                 <div className="space-y-5">
+                  {/* Tipo de Movimiento: Entrada / Salida */}
+                  <div className="p-3.5 bg-slate-800/40 border border-slate-800/60 rounded-xl">
+                    <p className="text-[10px] text-slate-400 mb-1.5 font-semibold uppercase tracking-wider">Tipo de Movimiento</p>
+                    {isEditing ? (
+                      <div className="grid grid-cols-2 gap-2 mt-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditForm(f => ({ ...f, type: 'expense' }))}
+                          className={cn(
+                            "py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1.5",
+                            editForm.type === 'expense'
+                              ? "bg-rose-500/20 text-rose-400 border-rose-500/30"
+                              : "bg-slate-800/50 text-slate-400 border-transparent hover:text-white"
+                          )}
+                        >
+                          💸 Salida (Egreso)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditForm(f => ({ ...f, type: 'income' }))}
+                          className={cn(
+                            "py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1.5",
+                            editForm.type === 'income'
+                              ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                              : "bg-slate-800/50 text-slate-400 border-transparent hover:text-white"
+                          )}
+                        >
+                          💰 Entrada (Ingreso)
+                        </button>
+                      </div>
+                    ) : (
+                      <p className={cn(
+                        "text-sm font-semibold flex items-center gap-1.5",
+                        transaction.type === 'income' ? "text-emerald-400" : "text-rose-400"
+                      )}>
+                        {transaction.type === 'income' ? "💰 Entrada (Ingreso/Cobro)" : "💸 Salida (Egreso/Pago)"}
+                      </p>
+                    )}
+                  </div>
+
                   {/* Entity and Category */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
@@ -517,17 +745,25 @@ export default function SideDrawer({
                           className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
                         >
                           <option value="otro" className="bg-slate-900 text-white">Otro</option>
-                          {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
-                            key !== 'otro' && (
-                              <option key={key} value={key} className="bg-slate-900 text-white">
-                                {label}
+                          {categories.length > 0 ? (
+                            categories.map(cat => (
+                              <option key={cat} value={cat} className="bg-slate-900 text-white">
+                                {cat}
                               </option>
-                            )
-                          ))}
+                            ))
+                          ) : (
+                            Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                              key !== 'otro' && (
+                                <option key={key} value={key} className="bg-slate-900 text-white">
+                                  {label}
+                                </option>
+                              )
+                            ))
+                          )}
                         </select>
                       ) : (
                         <p className="text-white text-sm font-medium">
-                          {CATEGORY_LABELS[transaction.category as keyof typeof CATEGORY_LABELS] || transaction.category || 'Otro'}
+                          {editForm.category || CATEGORY_LABELS[transaction.category as keyof typeof CATEGORY_LABELS] || transaction.category || 'Otro'}
                         </p>
                       )}
                     </div>
@@ -536,20 +772,34 @@ export default function SideDrawer({
                   {/* Dates & Recurrence */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
-                      <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Fecha Límite</p>
+                      <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Fecha de Pago (Ideal)</p>
                       {isEditing ? (
                         <input
                           type="date"
                           value={editForm.due_date}
-                          onChange={e => setEditForm(f => ({ ...f, due_date: e.target.value }))}
+                          onChange={e => setEditForm(f => ({ ...f, due_date: e.target.value, deadline_date: f.deadline_date || e.target.value }))}
                           className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
                         />
                       ) : (
                         <p className="text-white text-sm font-medium">{formatDate(transaction.due_date)}</p>
                       )}
                     </div>
-
+                    
                     <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
+                      <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Fecha Límite (Prórroga)</p>
+                      {isEditing ? (
+                        <input
+                          type="date"
+                          value={editForm.deadline_date || editForm.due_date}
+                          onChange={e => setEditForm(f => ({ ...f, deadline_date: e.target.value }))}
+                          className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
+                        />
+                      ) : (
+                        <p className="text-white text-sm font-medium">{transaction.deadline_date ? formatDate(transaction.deadline_date) : formatDate(transaction.due_date)}</p>
+                      )}
+                    </div>
+
+                    <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl col-span-2">
                       <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Periodicidad / Recurrencia</p>
                       {isEditing ? (
                         <select
@@ -566,6 +816,49 @@ export default function SideDrawer({
                       ) : (
                         <p className="text-white text-sm font-medium">
                           🔄 {RECURRENCE_OPTIONS.find(o => o.value === transaction.recurrence)?.label || 'Sin recurrencia'}
+                        </p>
+                      )}
+                      {editForm.recurrence === 'semi_monthly' && (
+                        <div className="mt-3 p-3 bg-slate-800/30 rounded-lg border border-slate-700/30">
+                          <p className="text-[10px] text-slate-500 mb-2">Días de vencimiento:</p>
+                          <div className="flex gap-2">
+                            {[1, 15].map(day => (
+                              <label key={day} className="flex items-center gap-1.5 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={editForm.recurrence_days?.includes(day) ?? true}
+                                  onChange={e => {
+                                    const days = e.target.checked
+                                      ? [...(editForm.recurrence_days || []), day].sort()
+                                      : (editForm.recurrence_days || []).filter(d => d !== day);
+                                    setEditForm(f => ({ ...f, recurrence_days: days }));
+                                  }}
+                                  className="w-4 h-4 rounded bg-slate-700 border-slate-600 text-emerald-500 focus:ring-emerald-500"
+                                />
+                                <span className="text-xs text-white">{day === 1 ? 'Día 1' : 'Día 15'}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Tolerance Days */}
+                    <div className="p-3 bg-slate-800/30 rounded-lg border border-slate-700/30">
+                      <label className="text-[10px] text-slate-500 block mb-1">Días de tolerancia después del vencimiento</label>
+                      {isEditing ? (
+                        <select
+                          value={editForm.tolerance_days ?? 2}
+                          onChange={e => setEditForm(f => ({ ...f, tolerance_days: parseInt(e.target.value) }))}
+                          className="w-full bg-slate-800 p-2 rounded-lg text-sm text-white focus:outline-none"
+                        >
+                          {[0, 1, 2, 3, 5, 7, 10].map(d => (
+                            <option key={d} value={d}>{d === 0 ? 'Sin tolerancia' : `${d} día${d > 1 ? 's' : ''}`}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <p className="text-sm text-slate-400">
+                          {editForm.tolerance_days ?? 2} día{editForm.tolerance_days !== 1 ? 's' : ''} de gracia
                         </p>
                       )}
                     </div>
@@ -602,14 +895,42 @@ export default function SideDrawer({
                             ))}
                           </select>
                         </div>
+                        
                         <div>
-                          <label className="text-[10px] text-slate-500 block mb-1">Cuenta Destino de Pago</label>
+                          <label className="text-[10px] text-slate-500 block mb-2">Banco Destino</label>
+                          <div className="grid grid-cols-4 gap-2 max-h-[120px] overflow-y-auto pr-1">
+                            {BANKS_CATALOG.map(bank => (
+                              <button
+                                key={bank.id}
+                                onClick={() => setEditForm(f => ({ ...f, bank_id: bank.id, payment_destination: `${bank.name}` }))}
+                                className={cn(
+                                  'p-2 rounded-lg border text-center transition-all hover:scale-105',
+                                  editForm.bank_id === bank.id
+                                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                                    : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-slate-600'
+                                )}
+                                title={bank.name}
+                              >
+                                <div className="text-xl mb-0.5">{bank.logo}</div>
+                                <div className="text-[9px] leading-tight">{bank.shortName}</div>
+                              </button>
+                            ))}
+                          </div>
+                          {editForm.bank_id && (
+                            <p className="text-[10px] text-emerald-400 mt-1">
+                              ✓ {BANKS_CATALOG.find(b => b.id === editForm.bank_id)?.name}
+                            </p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-slate-500 block mb-1">CLABE / Cuenta / Tarjeta</label>
                           <input
                             type="text"
-                            placeholder="Ej. BBVA CLABE 0123... o Tarjeta"
+                            placeholder="Ingresa CLABE, número de tarjeta o cuenta"
                             value={editForm.payment_destination}
                             onChange={e => setEditForm(f => ({ ...f, payment_destination: e.target.value }))}
-                            className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50"
+                            className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50 font-mono"
                           />
                         </div>
                       </div>
@@ -799,6 +1120,26 @@ export default function SideDrawer({
                       </p>
                     )}
                   </div>
+                  
+                  {/* Late Justification (if late or editing) */}
+                  {(isEditing || transaction.late_justification) && (
+                    <div className="mt-4 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                       <label className="text-[10px] text-amber-500 uppercase font-semibold tracking-wider block mb-1">Justificación de Pago Tardío</label>
+                       {isEditing ? (
+                         <textarea
+                           value={editForm.late_justification}
+                           onChange={e => setEditForm(f => ({ ...f, late_justification: e.target.value }))}
+                           placeholder="Motivo de la prórroga o pago atrasado..."
+                           rows={2}
+                           className="w-full p-3 bg-slate-900/40 border border-amber-500/30 rounded-xl text-xs text-white placeholder-slate-500 focus:outline-none resize-none"
+                         />
+                       ) : (
+                         <p className="text-xs text-amber-400/80 bg-slate-950/20 p-3 rounded-xl border border-amber-500/20 whitespace-pre-wrap">
+                           {transaction.late_justification}
+                         </p>
+                       )}
+                    </div>
+                  )}
 
                   {/* Punctuality Card */}
                   {punctuality && !isEditing && (
@@ -1034,7 +1375,7 @@ export default function SideDrawer({
             {/* Bottom Actions Bar */}
             <div className="p-6 border-t border-slate-800/50 flex flex-col gap-2 bg-slate-900">
               <div className="flex gap-2">
-                {onDelete && !transaction.id.startsWith('new_') && (
+                {typeof onDelete === 'function' && !transaction.id.startsWith('new_') && (
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
                     className="px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
@@ -1148,6 +1489,18 @@ export default function SideDrawer({
             )}
           </AnimatePresence>
         </>
+      )}
+      {showRecurrenceModal && (
+        <RecurrenceModal
+          isOpen={showRecurrenceModal}
+          description={editForm.description || transaction.description}
+          oldDate={pendingDateChange?.originalDate || transaction.due_date}
+          newDate={pendingDateChange?.newDate || editForm.due_date}
+          occurrenceCount={countFutureOccurrences(transaction, allTransactions, editForm.due_date)}
+          onUpdateThis={handleRecurrenceUpdateThis}
+          onUpdateAll={handleRecurrenceUpdateAll}
+          onCancel={handleRecurrenceCancel}
+        />
       )}
     </AnimatePresence>
   );
