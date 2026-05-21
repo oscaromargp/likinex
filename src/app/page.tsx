@@ -1,16 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { motion, useInView } from 'framer-motion';
 import {
   ArrowRight, BarChart3, Calendar, CreditCard, Bell, FileText,
   Zap, TrendingUp, ShieldCheck, Smartphone, Globe, Check,
   Menu, X, ChevronDown, Star, Layers, Wallet, Target, ArrowUpRight,
-  LayoutDashboard
+  LayoutDashboard, MessageCircle, Heart, Code2, MessageSquare,
+  Lightbulb, ExternalLink
 } from 'lucide-react';
 
-const PRIMARY_500 = '#3B82F6';
 const PRIMARY_RGB = '59, 130, 246';
 
 function Particles() {
@@ -44,16 +44,16 @@ function Particles() {
     }
 
     const draw = () => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx!.clearRect(0, 0, canvas.width, canvas.height);
       particles.forEach((p) => {
         p.x += p.vx;
         p.y += p.vy;
         if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
         if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${PRIMARY_RGB}, ${p.a})`;
-        ctx.fill();
+        ctx!.beginPath();
+        ctx!.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx!.fillStyle = `rgba(${PRIMARY_RGB}, ${p.a})`;
+        ctx!.fill();
       });
       particles.forEach((a, i) => {
         for (let j = i + 1; j < particles.length; j++) {
@@ -62,11 +62,11 @@ function Particles() {
           const dy = a.y - b.y;
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < 150) {
-            ctx.beginPath();
-            ctx.moveTo(a.x, a.y);
-            ctx.lineTo(b.x, b.y);
-            ctx.strokeStyle = `rgba(${PRIMARY_RGB}, ${0.06 * (1 - dist / 150)})`;
-            ctx.stroke();
+            ctx!.beginPath();
+            ctx!.moveTo(a.x, a.y);
+            ctx!.lineTo(b.x, b.y);
+            ctx!.strokeStyle = `rgba(${PRIMARY_RGB}, ${0.06 * (1 - dist / 150)})`;
+            ctx!.stroke();
           }
         }
       });
@@ -172,7 +172,33 @@ const faqs = [
   { q: '¿Mis datos están seguros?', a: 'Usamos Supabase con encriptación de extremo a extremo. Tus datos nunca se comparten con terceros.' },
   { q: '¿Soporta múltiples monedas?', a: 'Sí: MXN, USD, BTC, ETH, USDT y más con conversión automática en tiempo real.' },
   { q: '¿Funciona en mi celular?', a: 'Sí, está optimizado para móvil, tablet y escritorio. Puedes usarlo desde cualquier navegador.' },
-  { q: '¿Puedo exportar mis datos?', a: 'Sí, puedes descargar reportes en PDF y exportar tu libro mayor en CSV.' },
+  { q: '¿Puedo exportar sus datos?', a: 'Sí, puedes descargar reportes en PDF y exportar tu libro mayor en CSV.' },
+];
+
+const techStack = [
+  { name: 'Next.js 16', desc: 'React framework con App Router y Server Actions', color: '#fff' },
+  { name: 'Supabase', desc: 'Base de datos PostgreSQL, Auth y almacenamiento', color: '#3ECF8E' },
+  { name: 'Tailwind CSS v4', desc: 'Estilos utilitarios con diseño responsive', color: '#06B6D4' },
+  { name: 'TypeScript', desc: 'Tipado estático para código robusto', color: '#3178C6' },
+  { name: 'D3.js', desc: 'Gráficas vectoriales interactivas (rosenCharts)', color: '#F9A03C' },
+  { name: 'React Query', desc: 'Cache y sincronización de datos en tiempo real', color: '#FF4154' },
+  { name: 'Framer Motion', desc: 'Animaciones fluidas y transiciones', color: '#0055FF' },
+  { name: 'Lucide React', desc: 'Iconos vectoriales consistentes', color: '#fff' },
+  { name: 'Vercel', desc: 'Hosting serverless con despliegue continuo', color: '#fff' },
+];
+
+const screenshots = [
+  { src: '/images/dashboard-full.png', label: 'Dashboard Principal', desc: 'Métricas en tiempo real, flujo de caja y próximos pagos' },
+  { src: '/images/calendar-view.png', label: 'Calendario de Pagos', desc: 'Visualización mensual con recurrencias y alertas' },
+  { src: '/images/forecast-view.png', label: 'Proyección de Liquidez', desc: 'Cash flow forecast a 30 días con gráficas D3' },
+  { src: '/images/ledger-view.png', label: 'Libro Mayor', desc: 'Registro completo de ingresos y egresos' },
+  { src: '/images/credit-cards-view.png', label: 'Credit Card Engine', desc: 'Control de tarjetas, MSI y costo de oportunidad' },
+];
+
+const feedbackQuestions = [
+  { q: '¿Qué función te gustaría que agregáramos?', icon: Lightbulb },
+  { q: '¿Qué es lo que más te gusta de LikinEX?', icon: Heart },
+  { q: '¿Hay algo que te parezca complicado?', icon: MessageSquare },
 ];
 
 function Navbar({ scrolled, mobileOpen, setMobileOpen }: {
@@ -209,7 +235,8 @@ function Navbar({ scrolled, mobileOpen, setMobileOpen }: {
         <div className="hidden md:flex items-center gap-8">
           {[
             ['Características', '#features'],
-            ['Cómo funciona', '#how'],
+            ['Capturas', '#screenshots'],
+            ['Tecnología', '#tech'],
             ['FAQ', '#faq'],
           ].map(([label, href]) => (
             <a
@@ -230,14 +257,6 @@ function Navbar({ scrolled, mobileOpen, setMobileOpen }: {
               color: 'var(--primary)',
               borderColor: `rgba(${PRIMARY_RGB}, 0.3)`,
               background: `rgba(${PRIMARY_RGB}, 0.08)`,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = `rgba(${PRIMARY_RGB}, 0.15)`;
-              e.currentTarget.style.borderColor = `rgba(${PRIMARY_RGB}, 0.5)`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = `rgba(${PRIMARY_RGB}, 0.08)`;
-              e.currentTarget.style.borderColor = `rgba(${PRIMARY_RGB}, 0.3)`;
             }}
           >
             Modo Demo
@@ -271,7 +290,8 @@ function Navbar({ scrolled, mobileOpen, setMobileOpen }: {
           style={{ borderColor: `rgba(${PRIMARY_RGB}, 0.1)` }}
         >
           <a href="#features" className="block text-slate-300 py-2" onClick={() => setMobileOpen(false)}>Características</a>
-          <a href="#how" className="block text-slate-300 py-2" onClick={() => setMobileOpen(false)}>Cómo funciona</a>
+          <a href="#screenshots" className="block text-slate-300 py-2" onClick={() => setMobileOpen(false)}>Capturas</a>
+          <a href="#tech" className="block text-slate-300 py-2" onClick={() => setMobileOpen(false)}>Tecnología</a>
           <a href="#faq" className="block text-slate-300 py-2" onClick={() => setMobileOpen(false)}>FAQ</a>
           <div className="flex gap-3 pt-2">
             <Link href="/app?demo=true" className="flex-1 text-center px-4 py-2.5 rounded-lg text-sm font-medium border"
@@ -376,8 +396,6 @@ function HeroSection() {
               border: `1px solid rgba(${PRIMARY_RGB}, 0.3)`,
               color: '#E4E4E7',
             }}
-            onMouseEnter={(e) => e.currentTarget.style.borderColor = `rgba(${PRIMARY_RGB}, 0.6)`}
-            onMouseLeave={(e) => e.currentTarget.style.borderColor = `rgba(${PRIMARY_RGB}, 0.3)`}
           >
             Ver Características
             <ChevronDown size={18} />
@@ -460,9 +478,6 @@ function ComparisonSection() {
                       style={{
                         borderBottom: i < comparisonRows.length - 1 ? `1px solid rgba(${PRIMARY_RGB}, 0.06)` : 'none',
                       }}
-                      className="transition-colors duration-200"
-                      onMouseEnter={(e) => e.currentTarget.style.background = `rgba(${PRIMARY_RGB}, 0.04)`}
-                      onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
                     >
                       <td className="p-5 text-white font-medium">{row.feature}</td>
                       {[row.likinex, row.excel, row.apps, row.papel].map((val, j) => (
@@ -470,7 +485,7 @@ function ComparisonSection() {
                           {val ? (
                             <Check size={18} className="mx-auto" style={{ color: val && j === 0 ? 'var(--primary)' : '#22C55E' }} />
                           ) : (
-                            <span className="text-red-500/40 text-lg">—</span>
+                            <span className="text-red-500/40 text-lg">&mdash;</span>
                           )}
                         </td>
                       ))}
@@ -582,12 +597,101 @@ function HowItWorksSection() {
   );
 }
 
+function ScreenshotsSection() {
+  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px' });
+
+  return (
+    <section className="py-24 px-6" id="screenshots">
+      <div className="max-w-6xl mx-auto">
+        <FadeInSection>
+          <SectionTitle
+            label="CAPTURAS"
+            title="Así funciona LikinEX"
+            subtitle="Interfaz limpia, moderna y diseñada para la toma de decisiones."
+          />
+        </FadeInSection>
+
+        <div ref={ref} className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {screenshots.map((ss, i) => (
+            <motion.div
+              key={ss.label}
+              initial={{ opacity: 0, y: 20 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.5, delay: i * 0.1 }}
+              className="group cursor-pointer"
+              onClick={() => setSelectedIdx(selectedIdx === i ? null : i)}
+            >
+              <div
+                className="rounded-2xl overflow-hidden border transition-all duration-300 group-hover:border-blue-500/40 group-hover:shadow-lg group-hover:shadow-blue-500/10"
+                style={{
+                  borderColor: selectedIdx === i ? `rgba(${PRIMARY_RGB}, 0.4)` : `rgba(${PRIMARY_RGB}, 0.1)`,
+                  background: 'rgba(0,0,0,0.3)',
+                }}
+              >
+                <div className="relative aspect-video overflow-hidden">
+                  <img
+                    src={ss.src}
+                    alt={ss.label}
+                    className={`w-full h-full object-cover transition-all duration-500 ${
+                      selectedIdx === i ? 'scale-100' : 'scale-100 group-hover:scale-105'
+                    }`}
+                    style={{
+                      filter: selectedIdx === i ? 'none' : undefined,
+                    }}
+                  />
+                </div>
+                <div className="p-4">
+                  <h3 className="text-sm font-semibold text-white mb-1">{ss.label}</h3>
+                  <p className="text-xs" style={{ color: '#71717A' }}>{ss.desc}</p>
+                </div>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        {selectedIdx !== null && (
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+            onClick={() => setSelectedIdx(null)}
+          >
+            <div
+              className="relative max-w-5xl w-full rounded-2xl overflow-hidden border"
+              style={{ borderColor: `rgba(${PRIMARY_RGB}, 0.2)` }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={screenshots[selectedIdx].src}
+                alt={screenshots[selectedIdx].label}
+                className="w-full h-auto"
+              />
+              <div className="absolute bottom-0 left-0 right-0 p-4" style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.9))' }}>
+                <p className="text-white font-semibold">{screenshots[selectedIdx].label}</p>
+                <p className="text-sm" style={{ color: '#A1A1AA' }}>{screenshots[selectedIdx].desc}</p>
+              </div>
+              <button
+                className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-white text-xl border"
+                style={{ background: 'rgba(0,0,0,0.6)', borderColor: `rgba(${PRIMARY_RGB}, 0.3)` }}
+                onClick={() => setSelectedIdx(null)}
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function DashboardPreview() {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
 
   return (
-    <section className="py-24 px-6" id="preview">
+    <section className="py-24 px-6" style={{ background: '#09090B' }}>
       <div className="max-w-6xl mx-auto">
         <FadeInSection>
           <SectionTitle
@@ -604,7 +708,6 @@ function DashboardPreview() {
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
         >
           <GlassCard className="overflow-hidden">
-            {/* Terminal bar */}
             <div
               className="flex items-center gap-2 px-5 py-3.5 border-b"
               style={{
@@ -616,13 +719,11 @@ function DashboardPreview() {
               <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
               <div className="w-3 h-3 rounded-full bg-green-500/80" />
               <span className="ml-4 text-xs font-mono" style={{ color: '#71717A' }}>
-                likinex-dashboard — bash
+                likinex-dashboard &mdash; bash
               </span>
             </div>
 
-            {/* Content */}
             <div className="p-6 md:p-8">
-              {/* KPI Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 {[
                   { label: 'Comprometido', value: '$54,959', color: '#60A5FA' },
@@ -644,7 +745,6 @@ function DashboardPreview() {
                 ))}
               </div>
 
-              {/* Mini graph and calendar */}
               <div className="grid md:grid-cols-2 gap-6">
                 <div
                   className="rounded-xl p-5 border"
@@ -689,10 +789,7 @@ function DashboardPreview() {
                     ].map((p) => (
                       <div key={p.name} className="flex items-center justify-between py-2 border-b border-slate-800/50 last:border-0">
                         <div className="flex items-center gap-3">
-                          <div
-                            className={`w-2 h-2 rounded-full ${p.urgent ? '' : ''}`}
-                            style={{ background: p.urgent ? '#EF4444' : `rgba(${PRIMARY_RGB}, 0.5)` }}
-                          />
+                          <div className="w-2 h-2 rounded-full" style={{ background: p.urgent ? '#EF4444' : `rgba(${PRIMARY_RGB}, 0.5)` }} />
                           <div>
                             <p className="text-sm text-white">{p.name}</p>
                             <p className="text-xs" style={{ color: '#71717A' }}>{p.date}</p>
@@ -727,6 +824,74 @@ function DashboardPreview() {
             Explorar Demo Interactivo
             <ArrowRight size={18} />
           </Link>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function TechStackSection() {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px' });
+
+  return (
+    <section className="py-24 px-6" id="tech">
+      <div className="max-w-6xl mx-auto">
+        <FadeInSection>
+          <SectionTitle
+            label="TRANSPARENCIA TECNOLÓGICA"
+            title="Construido con tecnología moderna"
+            subtitle="Stack 100% open source. Código disponible en GitHub."
+          />
+        </FadeInSection>
+
+        <div ref={ref} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-12">
+          {techStack.map((t, i) => (
+            <motion.div
+              key={t.name}
+              initial={{ opacity: 0, y: 20 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.4, delay: i * 0.05 }}
+            >
+              <div
+                className="p-5 rounded-xl border text-center h-full transition-all duration-300 hover:scale-105"
+                style={{
+                  borderColor: `rgba(${PRIMARY_RGB}, 0.1)`,
+                  background: `rgba(${PRIMARY_RGB}, 0.03)`,
+                }}
+              >
+                <div
+                  className="w-3 h-3 rounded-full mx-auto mb-3"
+                  style={{ background: t.color }}
+                />
+                <h3 className="text-sm font-semibold text-white mb-1">{t.name}</h3>
+                <p className="text-[11px]" style={{ color: '#71717A' }}>{t.desc}</p>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5, delay: 0.5 }}
+          className="text-center"
+        >
+          <a
+            href="https://github.com/oscaromargp/likinex"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-3 px-6 py-3 rounded-xl font-semibold text-sm transition-all duration-300 hover:scale-105"
+            style={{
+              background: `rgba(${PRIMARY_RGB}, 0.08)`,
+              border: `1px solid rgba(${PRIMARY_RGB}, 0.25)`,
+              color: '#E4E4E7',
+            }}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+            Ver código en GitHub
+            <ArrowUpRight size={16} />
+          </a>
         </motion.div>
       </div>
     </section>
@@ -783,6 +948,154 @@ function TestimonialsSection() {
             </motion.div>
           ))}
         </div>
+      </div>
+    </section>
+  );
+}
+
+function DigitalSovereigntySection() {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px' });
+
+  return (
+    <section className="py-24 px-6 relative overflow-hidden">
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: `radial-gradient(ellipse 50% 50% at 50% 50%, rgba(${PRIMARY_RGB}, 0.06) 0%, transparent 60%)`,
+        }}
+      />
+
+      <div className="max-w-5xl mx-auto relative z-10">
+        <FadeInSection>
+          <SectionTitle
+            label="DEPENDENCIA DIGITAL"
+            title="Impulsa la dependencia digital"
+            subtitle="Creemos en un ecosistema digital libre, transparente y construido con tecnología abierta."
+          />
+        </FadeInSection>
+
+        <div ref={ref} className="grid md:grid-cols-2 gap-6 mb-10">
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={inView ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: 0.6 }}
+          >
+            <GlassCard className="p-8 h-full">
+              <Code2 size={32} className="mb-4" style={{ color: 'var(--primary)' }} />
+              <h3 className="text-xl font-bold text-white mb-3">Código Abierto</h3>
+              <p className="text-sm leading-relaxed" style={{ color: '#A1A1AA' }}>
+                Todo el código de LikinEX es público y auditable. Creemos en la transparencia como pilar fundamental
+                de la confianza digital. No escondemos cómo funcionamos — mostramos cada línea.
+              </p>
+            </GlassCard>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={inView ? { opacity: 1, x: 0 } : {}}
+            transition={{ duration: 0.6, delay: 0.1 }}
+          >
+            <GlassCard className="p-8 h-full">
+              <Heart size={32} className="mb-4" style={{ color: 'var(--primary)' }} />
+              <h3 className="text-xl font-bold text-white mb-3">Construido con ❤️</h3>
+              <p className="text-sm leading-relaxed" style={{ color: '#A1A1AA' }}>
+                LikinEX nació como un proyecto personal para resolver un problema real. Hoy es una herramienta
+                gratuita para cualquiera que quiera tomar el control de sus finanzas.
+              </p>
+            </GlassCard>
+          </motion.div>
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+          <GlassCard className="p-8 text-center">
+            <h3 className="text-xl font-bold text-white mb-4">Apoya el proyecto</h3>
+            <p className="text-sm leading-relaxed mb-6 max-w-xl mx-auto" style={{ color: '#A1A1AA' }}>
+              Si LikinEX te ha sido útil, puedes apoyar el desarrollo continuo con una donación en XRP.
+              Cada contribución ayuda a mantener el servicio gratuito.
+            </p>
+            <div
+              className="inline-flex items-center gap-3 px-6 py-4 rounded-xl font-mono text-sm mb-4"
+              style={{
+                background: `rgba(${PRIMARY_RGB}, 0.06)`,
+                border: `1px solid rgba(${PRIMARY_RGB}, 0.15)`,
+                color: '#D4D4D8',
+              }}
+            >
+              <Wallet size={18} style={{ color: 'var(--primary)' }} />
+              <span className="break-all">rEBV8fMkY4t3xDCkH8A7J6y9Z5nL2pQmWx</span>
+            </div>
+            <p className="text-xs" style={{ color: '#52525B' }}>
+              XRP Ledger — Cualquier cantidad es bienvenida 🙏
+            </p>
+          </GlassCard>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function FeedbackSection() {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-80px' });
+
+  return (
+    <section className="py-24 px-6" style={{ background: '#09090B' }}>
+      <div className="max-w-4xl mx-auto">
+        <FadeInSection>
+          <SectionTitle
+            label="TU OPINIÓN IMPORTA"
+            title="¿Qué opinas de LikinEX?"
+            subtitle="Tu feedback nos ayuda a mejorar. Comparte tus ideas, sugerencias o reportes."
+          />
+        </FadeInSection>
+
+        <div ref={ref} className="grid md:grid-cols-3 gap-5 mb-8">
+          {feedbackQuestions.map((fq, i) => (
+            <motion.div
+              key={fq.q}
+              initial={{ opacity: 0, y: 20 }}
+              animate={inView ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.4, delay: i * 0.1 }}
+            >
+              <GlassCard className="p-6 text-center h-full">
+                <fq.icon size={28} className="mx-auto mb-4" style={{ color: 'var(--primary)' }} />
+                <p className="text-sm leading-relaxed" style={{ color: '#D4D4D8' }}>
+                  {fq.q}
+                </p>
+              </GlassCard>
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={inView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="text-center"
+        >
+          <a
+            href="https://github.com/oscaromargp/likinex/issues"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-3 px-8 py-4 rounded-xl font-semibold transition-all duration-300 hover:scale-105"
+            style={{
+              background: `linear-gradient(135deg, #2563EB, var(--primary))`,
+              color: 'white',
+            }}
+          >
+            <MessageSquare size={20} />
+            Dejar mi opinión en GitHub
+            <ArrowUpRight size={18} />
+          </a>
+          <p className="mt-3 text-xs" style={{ color: '#52525B' }}>
+            Puedes abrir un issue, sugerir una feature o reportar un bug
+          </p>
+        </motion.div>
       </div>
     </section>
   );
@@ -914,7 +1227,9 @@ function CustomDevCTA() {
             </div>
 
             <a
-              href="mailto:contacto@likinex.com"
+              href="https://wa.me/526121077805"
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-white font-semibold text-lg transition-all duration-300 hover:scale-105"
               style={{
                 background: `linear-gradient(135deg, #2563EB, var(--primary), #60A5FA)`,
@@ -922,6 +1237,7 @@ function CustomDevCTA() {
                 animation: 'gradient-shift 4s ease infinite, pulse-glow 3s ease-in-out infinite',
               }}
             >
+              <MessageCircle size={22} />
               Hablemos de tu proyecto
               <ArrowUpRight size={20} />
             </a>
@@ -966,10 +1282,11 @@ function FooterSection() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: '#52525B' }}>Producto</p>
             <div className="space-y-2.5">
-              {['Características', 'Demo', 'FAQ', 'Roadmap'].map((l) => (
-                <a key={l} href="#" className="block text-sm transition-colors duration-200" style={{ color: '#A1A1AA' }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = '#A1A1AA'}
+              {['Características', 'Demo', 'FAQ', 'GitHub'].map((l) => (
+                <a key={l} href={l === 'GitHub' ? 'https://github.com/oscaromargp/likinex' : '#'}
+                  className="block text-sm transition-colors duration-200" style={{ color: '#A1A1AA' }}
+                  target={l === 'GitHub' ? '_blank' : undefined}
+                  rel={l === 'GitHub' ? 'noopener noreferrer' : undefined}
                 >
                   {l}
                 </a>
@@ -985,10 +1302,7 @@ function FooterSection() {
                 ['Términos', '/legal/terminos'],
                 ['Cookies', '/legal/cookies'],
               ].map(([l, href]) => (
-                <Link key={l} href={href} className="block text-sm transition-colors duration-200" style={{ color: '#A1A1AA' }}
-                  onMouseEnter={(e) => e.currentTarget.style.color = 'var(--primary)'}
-                  onMouseLeave={(e) => e.currentTarget.style.color = '#A1A1AA'}
-                >
+                <Link key={l} href={href} className="block text-sm transition-colors duration-200" style={{ color: '#A1A1AA' }}>
                   {l}
                 </Link>
               ))}
@@ -997,22 +1311,33 @@ function FooterSection() {
         </div>
 
         <div
-          className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 border-t"
+          className="pt-8 flex flex-col items-center gap-6 border-t"
           style={{ borderColor: `rgba(${PRIMARY_RGB}, 0.06)` }}
         >
-          <p className="text-xs" style={{ color: '#52525B' }}>
-            &copy; {new Date().getFullYear()} LikinEX. Todos los derechos reservados.
-          </p>
-          <div className="flex gap-6 text-xs" style={{ color: '#52525B' }}>
-            <span>Hecho con ❤️ en México</span>
-            <a
-              href="https://github.com/oscaromargp"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-white transition-colors"
-            >
-              GitHub
-            </a>
+          <div className="text-center max-w-xl">
+            <p className="text-xs italic leading-relaxed" style={{ color: '#52525B' }}>
+              &ldquo;Porque Dios es el que en vosotros produce así el querer como el hacer, por su buena voluntad.&rdquo;
+            </p>
+            <p className="text-xs mt-1 font-semibold" style={{ color: '#71717A' }}>
+              &mdash; Filipenses 2:13
+            </p>
+          </div>
+
+          <div className="flex flex-col md:flex-row items-center justify-between w-full gap-4">
+            <p className="text-xs" style={{ color: '#52525B' }}>
+              &copy; {new Date().getFullYear()} LikinEX. Todos los derechos reservados.
+            </p>
+            <div className="flex gap-6 text-xs" style={{ color: '#52525B' }}>
+              <span>Hecho con ❤️ en México</span>
+              <a
+                href="https://github.com/oscaromargp"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-white transition-colors"
+              >
+                GitHub
+              </a>
+            </div>
           </div>
         </div>
       </div>
@@ -1038,8 +1363,12 @@ export default function Home() {
       <ComparisonSection />
       <FeaturesSection />
       <HowItWorksSection />
+      <ScreenshotsSection />
       <DashboardPreview />
+      <TechStackSection />
       <TestimonialsSection />
+      <DigitalSovereigntySection />
+      <FeedbackSection />
       <FAQSection />
       <CustomDevCTA />
       <FooterSection />
