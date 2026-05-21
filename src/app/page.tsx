@@ -176,15 +176,15 @@ const faqs = [
 ];
 
 const techStack = [
-  { name: 'Next.js 16', desc: 'React framework con App Router y Server Actions', color: '#fff' },
-  { name: 'Supabase', desc: 'Base de datos PostgreSQL, Auth y almacenamiento', color: '#3ECF8E' },
-  { name: 'Tailwind CSS v4', desc: 'Estilos utilitarios con diseño responsive', color: '#06B6D4' },
-  { name: 'TypeScript', desc: 'Tipado estático para código robusto', color: '#3178C6' },
-  { name: 'D3.js', desc: 'Gráficas vectoriales interactivas (rosenCharts)', color: '#F9A03C' },
-  { name: 'React Query', desc: 'Cache y sincronización de datos en tiempo real', color: '#FF4154' },
-  { name: 'Framer Motion', desc: 'Animaciones fluidas y transiciones', color: '#0055FF' },
-  { name: 'Lucide React', desc: 'Iconos vectoriales consistentes', color: '#fff' },
-  { name: 'Vercel', desc: 'Hosting serverless con despliegue continuo', color: '#fff' },
+  { name: 'Next.js 16', desc: 'React framework con App Router', icon: '▲', brandBg: '#fff', brandFg: '#000' },
+  { name: 'Supabase', desc: 'PostgreSQL, Auth y almacenamiento', icon: '◬', brandBg: '#3ECF8E', brandFg: '#000' },
+  { name: 'Tailwind v4', desc: 'Estilos utilitarios responsive', icon: '🌊', brandBg: '#06B6D4', brandFg: '#000' },
+  { name: 'TypeScript', desc: 'Tipado estático para código robusto', icon: 'TS', brandBg: '#3178C6', brandFg: '#fff' },
+  { name: 'D3.js', desc: 'Gráficas vectoriales interactivas', icon: 'd3', brandBg: '#F9A03C', brandFg: '#000' },
+  { name: 'React Query', desc: 'Cache y datos en tiempo real', icon: 'RQ', brandBg: '#FF4154', brandFg: '#fff' },
+  { name: 'Framer Motion', desc: 'Animaciones y transiciones', icon: 'FM', brandBg: '#0055FF', brandFg: '#fff' },
+  { name: 'Lucide', desc: 'Iconos vectoriales consistentes', icon: '◇', brandBg: '#fff', brandFg: '#000' },
+  { name: 'Vercel', desc: 'Hosting serverless continuo', icon: '▲', brandBg: '#fff', brandFg: '#000' },
 ];
 
 const screenshots = [
@@ -451,24 +451,27 @@ function ComparisonSection() {
           <div
             className="overflow-hidden rounded-3xl border"
             style={{
-              borderColor: `rgba(${PRIMARY_RGB}, 0.1)`,
-              background: `linear-gradient(135deg, rgba(${PRIMARY_RGB}, 0.03), transparent)`,
+              borderColor: `rgba(${PRIMARY_RGB}, 0.12)`,
+              background: `rgba(${PRIMARY_RGB}, 0.02)`,
             }}
           >
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr style={{ borderBottom: `1px solid rgba(${PRIMARY_RGB}, 0.1)` }}>
-                    <th className="text-left p-5 font-semibold text-white">Funcionalidad</th>
-                    <th className="p-5 text-center font-semibold" style={{ color: 'var(--primary)' }}>
-                      <span className="flex items-center justify-center gap-1.5">
-                        <div className="w-2 h-2 rounded-full" style={{ background: 'var(--primary)' }} />
-                        LikinEX
-                      </span>
-                    </th>
-                    <th className="p-5 text-center font-medium" style={{ color: '#A1A1AA' }}>Excel</th>
-                    <th className="p-5 text-center font-medium" style={{ color: '#A1A1AA' }}>Apps Bancarias</th>
-                    <th className="p-5 text-center font-medium" style={{ color: '#A1A1AA' }}>Papel y Lápiz</th>
+                  <tr style={{ background: `rgba(${PRIMARY_RGB}, 0.06)` }}>
+                    <th className="text-left p-4 font-semibold text-white">Funcionalidad</th>
+                    {['LikinEX', 'Excel', 'Apps Bancarias', 'Papel y Lápiz'].map((name, j) => (
+                      <th
+                        key={name}
+                        className="p-4 text-center font-semibold"
+                        style={{
+                          color: j === 0 ? 'var(--primary)' : '#A1A1AA',
+                          background: j === 0 ? `rgba(${PRIMARY_RGB}, 0.08)` : 'transparent',
+                        }}
+                      >
+                        {name}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -477,15 +480,36 @@ function ComparisonSection() {
                       key={row.feature}
                       style={{
                         borderBottom: i < comparisonRows.length - 1 ? `1px solid rgba(${PRIMARY_RGB}, 0.06)` : 'none',
+                        background: i % 2 === 0 ? `rgba(255,255,255,0.02)` : 'transparent',
                       }}
                     >
-                      <td className="p-5 text-white font-medium">{row.feature}</td>
+                      <td className="p-4 text-white font-medium">{row.feature}</td>
                       {[row.likinex, row.excel, row.apps, row.papel].map((val, j) => (
-                        <td key={j} className="p-5 text-center">
+                        <td
+                          key={j}
+                          className="p-4 text-center"
+                          style={{
+                            background: j === 0 ? `rgba(${PRIMARY_RGB}, 0.04)` : 'transparent',
+                          }}
+                        >
                           {val ? (
-                            <Check size={18} className="mx-auto" style={{ color: val && j === 0 ? 'var(--primary)' : '#22C55E' }} />
+                            <span
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-full text-white text-sm font-bold"
+                              style={{
+                                background: j === 0
+                                  ? `linear-gradient(135deg, #2563EB, var(--primary))`
+                                  : '#22C55E',
+                                boxShadow: j === 0 ? `0 0 12px rgba(${PRIMARY_RGB}, 0.4)` : 'none',
+                              }}
+                            >
+                              ✓
+                            </span>
                           ) : (
-                            <span className="text-red-500/40 text-lg">&mdash;</span>
+                            <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-bold rounded-full"
+                              style={{ background: 'rgba(239,68,68,0.15)', color: '#EF4444' }}
+                            >
+                              ✕
+                            </span>
                           )}
                         </td>
                       ))}
@@ -598,89 +622,115 @@ function HowItWorksSection() {
 }
 
 function ScreenshotsSection() {
-  const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [current, setCurrent] = useState(0);
+  const [direction, setDirection] = useState(0);
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
 
+  const prev = () => {
+    setDirection(-1);
+    setCurrent((c) => (c === 0 ? screenshots.length - 1 : c - 1));
+  };
+  const next = () => {
+    setDirection(1);
+    setCurrent((c) => (c === screenshots.length - 1 ? 0 : c + 1));
+  };
+
+  useEffect(() => {
+    if (!inView) return;
+    const timer = setInterval(() => {
+      setDirection(1);
+      setCurrent((c) => (c === screenshots.length - 1 ? 0 : c + 1));
+    }, 5000);
+    return () => clearInterval(timer);
+  }, [inView]);
+
+  const ss = screenshots[current];
+
   return (
     <section className="py-24 px-6" id="screenshots">
-      <div className="max-w-6xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <FadeInSection>
-          <SectionTitle
-            label="CAPTURAS"
-            title="Así funciona LikinEX"
-            subtitle="Interfaz limpia, moderna y diseñada para la toma de decisiones."
-          />
+          <div className="text-center mb-16">
+            <span className="text-xs tracking-[0.2em] uppercase font-semibold" style={{ color: `var(--primary)` }}>
+              CAPTURAS
+            </span>
+            <h2 className="text-4xl md:text-5xl font-bold mt-4 mb-4 text-white leading-tight">
+              Así funciona <span style={{ color: 'var(--primary)' }}>LikinEX</span>
+            </h2>
+            <p className="text-lg max-w-2xl mx-auto" style={{ color: '#A1A1AA' }}>
+              Interfaz limpia, moderna y diseñada para la toma de decisiones.
+            </p>
+          </div>
         </FadeInSection>
 
-        <div ref={ref} className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {screenshots.map((ss, i) => (
-            <motion.div
-              key={ss.label}
-              initial={{ opacity: 0, y: 20 }}
-              animate={inView ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.5, delay: i * 0.1 }}
-              className="group cursor-pointer"
-              onClick={() => setSelectedIdx(selectedIdx === i ? null : i)}
-            >
-              <div
-                className="rounded-2xl overflow-hidden border transition-all duration-300 group-hover:border-blue-500/40 group-hover:shadow-lg group-hover:shadow-blue-500/10"
-                style={{
-                  borderColor: selectedIdx === i ? `rgba(${PRIMARY_RGB}, 0.4)` : `rgba(${PRIMARY_RGB}, 0.1)`,
-                  background: 'rgba(0,0,0,0.3)',
-                }}
-              >
-                <div className="relative aspect-video overflow-hidden">
-                  <img
-                    src={ss.src}
-                    alt={ss.label}
-                    className={`w-full h-full object-cover transition-all duration-500 ${
-                      selectedIdx === i ? 'scale-100' : 'scale-100 group-hover:scale-105'
-                    }`}
-                    style={{
-                      filter: selectedIdx === i ? 'none' : undefined,
-                    }}
-                  />
-                </div>
-                <div className="p-4">
-                  <h3 className="text-sm font-semibold text-white mb-1">{ss.label}</h3>
-                  <p className="text-xs" style={{ color: '#71717A' }}>{ss.desc}</p>
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        {selectedIdx !== null && (
-          <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-            style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
-            onClick={() => setSelectedIdx(null)}
+        <div ref={ref} className="relative">
+          <motion.div
+            key={current}
+            initial={{ opacity: 0, x: direction * 80 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="rounded-2xl overflow-hidden border"
+            style={{
+              borderColor: `rgba(${PRIMARY_RGB}, 0.15)`,
+              background: `rgba(${PRIMARY_RGB}, 0.03)`,
+            }}
           >
-            <div
-              className="relative max-w-5xl w-full rounded-2xl overflow-hidden border"
-              style={{ borderColor: `rgba(${PRIMARY_RGB}, 0.2)` }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <img
-                src={screenshots[selectedIdx].src}
-                alt={screenshots[selectedIdx].label}
-                className="w-full h-auto"
-              />
-              <div className="absolute bottom-0 left-0 right-0 p-4" style={{ background: 'linear-gradient(transparent, rgba(0,0,0,0.9))' }}>
-                <p className="text-white font-semibold">{screenshots[selectedIdx].label}</p>
-                <p className="text-sm" style={{ color: '#A1A1AA' }}>{screenshots[selectedIdx].desc}</p>
-              </div>
+            <img
+              src={ss.src}
+              alt={ss.label}
+              className="w-full h-auto"
+            />
+          </motion.div>
+
+          <button
+            onClick={prev}
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white border transition-all duration-200 hover:scale-110 z-10"
+            style={{
+              background: 'rgba(0,0,0,0.6)',
+              borderColor: `rgba(${PRIMARY_RGB}, 0.3)`,
+              backdropFilter: 'blur(8px)',
+            }}
+            aria-label="Anterior"
+          >
+            <ChevronDown size={20} className="rotate-90" />
+          </button>
+          <button
+            onClick={next}
+            className="absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center text-white border transition-all duration-200 hover:scale-110 z-10"
+            style={{
+              background: 'rgba(0,0,0,0.6)',
+              borderColor: `rgba(${PRIMARY_RGB}, 0.3)`,
+              backdropFilter: 'blur(8px)',
+            }}
+            aria-label="Siguiente"
+          >
+            <ChevronDown size={20} className="-rotate-90" />
+          </button>
+
+          <div className="flex items-center justify-center gap-2 mt-6">
+            {screenshots.map((_, i) => (
               <button
-                className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-white text-xl border"
-                style={{ background: 'rgba(0,0,0,0.6)', borderColor: `rgba(${PRIMARY_RGB}, 0.3)` }}
-                onClick={() => setSelectedIdx(null)}
-              >
-                ✕
-              </button>
-            </div>
+                key={i}
+                onClick={() => { setDirection(i > current ? 1 : -1); setCurrent(i); }}
+                className="rounded-full transition-all duration-300"
+                style={{
+                  width: i === current ? '28px' : '8px',
+                  height: '8px',
+                  background: i === current
+                    ? `linear-gradient(135deg, #2563EB, var(--primary))`
+                    : `rgba(${PRIMARY_RGB}, 0.2)`,
+                }}
+                aria-label={`Ir a imagen ${i + 1}`}
+              />
+            ))}
           </div>
-        )}
+
+          <div className="text-center mt-4">
+            <p className="text-white font-semibold text-lg">{ss.label}</p>
+            <p className="text-sm mt-1" style={{ color: '#A1A1AA' }}>{ss.desc}</p>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -696,8 +746,8 @@ function DashboardPreview() {
         <FadeInSection>
           <SectionTitle
             label="DEMO"
-            title="Vista previa del Dashboard"
-            subtitle="Interfaz limpia, rápida y diseñada para la toma de decisiones."
+            title="Dashboard en Tiempo Real"
+            subtitle="Métricas, flujo de caja y calendario en un solo lugar."
           />
         </FadeInSection>
 
@@ -707,104 +757,18 @@ function DashboardPreview() {
           animate={inView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
         >
-          <GlassCard className="overflow-hidden">
-            <div
-              className="flex items-center gap-2 px-5 py-3.5 border-b"
-              style={{
-                background: `rgba(${PRIMARY_RGB}, 0.05)`,
-                borderColor: `rgba(${PRIMARY_RGB}, 0.1)`,
-              }}
-            >
-              <div className="w-3 h-3 rounded-full bg-red-500/80" />
-              <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-              <div className="w-3 h-3 rounded-full bg-green-500/80" />
-              <span className="ml-4 text-xs font-mono" style={{ color: '#71717A' }}>
-                likinex-dashboard &mdash; bash
-              </span>
-            </div>
-
-            <div className="p-6 md:p-8">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {[
-                  { label: 'Comprometido', value: '$54,959', color: '#60A5FA' },
-                  { label: 'Liquidado', value: '$928', color: '#34D399' },
-                  { label: 'Pendiente', value: '$54,031', color: '#FBBF24' },
-                  { label: 'Disponible', value: '$928', color: '#22D3EE' },
-                ].map((m) => (
-                  <div
-                    key={m.label}
-                    className="p-4 rounded-xl border"
-                    style={{
-                      background: `rgba(${PRIMARY_RGB}, 0.04)`,
-                      borderColor: `rgba(${PRIMARY_RGB}, 0.08)`,
-                    }}
-                  >
-                    <p className="text-xs font-medium mb-1" style={{ color: '#71717A' }}>{m.label}</p>
-                    <p className="text-xl md:text-2xl font-bold" style={{ color: m.color }}>{m.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                <div
-                  className="rounded-xl p-5 border"
-                  style={{
-                    background: `rgba(${PRIMARY_RGB}, 0.03)`,
-                    borderColor: `rgba(${PRIMARY_RGB}, 0.08)`,
-                  }}
-                >
-                  <p className="text-sm font-semibold text-white mb-4">Flujo de Caja (7 días)</p>
-                  <div className="flex items-end gap-2 h-24">
-                    {[40, 65, 35, 80, 55, 70, 90].map((h, i) => (
-                      <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                        <div
-                          className="w-full rounded-t-md transition-all duration-500"
-                          style={{
-                            height: `${h}%`,
-                            background: `linear-gradient(to top, rgba(${PRIMARY_RGB}, 0.3), var(--primary))`,
-                            borderRadius: '4px 4px 0 0',
-                          }}
-                        />
-                        <span className="text-[10px]" style={{ color: '#52525B' }}>
-                          {['L', 'M', 'M', 'J', 'V', 'S', 'D'][i]}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div
-                  className="rounded-xl p-5 border"
-                  style={{
-                    background: `rgba(${PRIMARY_RGB}, 0.03)`,
-                    borderColor: `rgba(${PRIMARY_RGB}, 0.08)`,
-                  }}
-                >
-                  <p className="text-sm font-semibold text-white mb-4">Próximos Pagos</p>
-                  <div className="space-y-3">
-                    {[
-                      { name: 'Renta', amount: '$15,000', date: 'May 25', urgent: true },
-                      { name: 'Netflix', amount: '$239', date: 'May 27', urgent: false },
-                      { name: 'Luz (CFE)', amount: '$850', date: 'Jun 5', urgent: false },
-                    ].map((p) => (
-                      <div key={p.name} className="flex items-center justify-between py-2 border-b border-slate-800/50 last:border-0">
-                        <div className="flex items-center gap-3">
-                          <div className="w-2 h-2 rounded-full" style={{ background: p.urgent ? '#EF4444' : `rgba(${PRIMARY_RGB}, 0.5)` }} />
-                          <div>
-                            <p className="text-sm text-white">{p.name}</p>
-                            <p className="text-xs" style={{ color: '#71717A' }}>{p.date}</p>
-                          </div>
-                        </div>
-                        <span className="text-sm font-medium" style={{ color: p.urgent ? '#FCA5A5' : '#E4E4E7' }}>
-                          {p.amount}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </GlassCard>
+          <div
+            className="rounded-2xl overflow-hidden border"
+            style={{
+              borderColor: `rgba(${PRIMARY_RGB}, 0.12)`,
+            }}
+          >
+            <img
+              src="/images/dashboard-full.png"
+              alt="Dashboard Principal de LikinEX"
+              className="w-full h-auto"
+            />
+          </div>
         </motion.div>
 
         <motion.div
@@ -861,9 +825,14 @@ function TechStackSection() {
                 }}
               >
                 <div
-                  className="w-3 h-3 rounded-full mx-auto mb-3"
-                  style={{ background: t.color }}
-                />
+                  className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3 text-sm font-bold"
+                  style={{
+                    background: t.brandBg,
+                    color: t.brandFg,
+                  }}
+                >
+                  {t.icon}
+                </div>
                 <h3 className="text-sm font-semibold text-white mb-1">{t.name}</h3>
                 <p className="text-[11px]" style={{ color: '#71717A' }}>{t.desc}</p>
               </div>
