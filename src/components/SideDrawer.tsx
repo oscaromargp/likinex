@@ -324,8 +324,8 @@ const handleSave = () => {
       alert('La descripción es obligatoria');
       return;
     }
-    if (editForm.amount <= 0) {
-      alert('El monto debe ser mayor a 0');
+    if (editForm.amount < 0) {
+      alert('El monto no puede ser negativo');
       return;
     }
     if (!editForm.entity) {
@@ -1058,13 +1058,15 @@ const handleSave = () => {
                           </select>
                         )}
                         
-                        <input
-                          type="text"
-                          placeholder="CLABE, cuenta o tarjeta destino"
-                          value={editForm.payment_destination}
-                          onChange={e => setEditForm(f => ({ ...f, payment_destination: e.target.value }))}
-                          className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50 font-mono"
-                        />
+                        {(!selectedContact || !selectedContact.bank_accounts || selectedContact.bank_accounts.length === 0) && (
+                          <input
+                            type="text"
+                            placeholder="CLABE, cuenta o tarjeta destino"
+                            value={editForm.payment_destination}
+                            onChange={e => setEditForm(f => ({ ...f, payment_destination: e.target.value }))}
+                            className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50 font-mono"
+                          />
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-2 text-sm">
@@ -1667,7 +1669,7 @@ const handleSave = () => {
             {/* Bottom Actions Bar */}
             <div className="p-6 border-t border-slate-800/50 flex flex-col gap-2 bg-slate-900">
               <div className="flex gap-2">
-                {typeof onDelete === 'function' && !transaction.id.startsWith('new_') && (
+                {typeof onDelete === 'function' && !transaction.id.startsWith('new_') && !(transaction as any).isProjection && (
                   <button
                     onClick={() => setShowDeleteConfirm(true)}
                     className="px-4 py-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"

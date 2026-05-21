@@ -1,30 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const MIGRATION_SECRET = process.env.MIGRATION_SECRET || 'likinex-migrate-2026';
+const PROJECT_REF = 'tmcqyscstxlilfbsdcwn';
 
-export async function POST(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const secret = searchParams.get('secret');
-
-  if (secret !== MIGRATION_SECRET) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  const { Client } = await import('pg');
-
-  const client = new Client({
-    host: 'db.tmcqyscstxlilfbsdcwn.supabase.co',
-    port: 5432,
-    database: 'postgres',
-    user: 'postgres',
-    password: process.env.SUPABASE_DB_PASSWORD,
-    ssl: { rejectUnauthorized: false },
-  });
-
-  try {
-    await client.connect();
-
-    const sql = `
+const MIGRATION_SQL = `
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 DO $$ BEGIN CREATE TYPE transaction_status AS ENUM ('pending', 'settled', 'cancelled'); EXCEPTION WHEN duplicate_object THEN null; END $$;
@@ -36,9 +15,16 @@ DO $$ BEGIN CREATE TYPE category_type AS ENUM ('income', 'expense'); EXCEPTION W
 
 CREATE TABLE IF NOT EXISTS entities (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE, name VARCHAR(255) NOT NULL, icon VARCHAR(10) NOT NULL DEFAULT '📁', color VARCHAR(50) NOT NULL DEFAULT 'emerald', type entity_type NOT NULL DEFAULT 'personal', is_active BOOLEAN NOT NULL DEFAULT true, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS categories (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE, name VARCHAR(255) NOT NULL, icon VARCHAR(10) NOT NULL DEFAULT '📁', color VARCHAR(50) NOT NULL DEFAULT 'emerald', type category_type NOT NULL DEFAULT 'expense', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
-CREATE TABLE IF NOT EXISTS transactions (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE, template_id UUID, entity VARCHAR(255) NOT NULL, description TEXT NOT NULL, amount DECIMAL(15, 2) NOT NULL, currency currency_type NOT NULL DEFAULT 'MXN', due_date DATE NOT NULL, paid_date DATE, status transaction_status NOT NULL DEFAULT 'pending', recurrence recurrence_type NOT NULL DEFAULT 'none', recurrence_day INTEGER, payment_method payment_method, category VARCHAR(100), type VARCHAR(20) DEFAULT 'expense', notes TEXT, follow_up TEXT, attachment_url TEXT, price_change DECIMAL(10, 2), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS transactions (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE, template_id UUID, entity VARCHAR(255) NOT NULL, description TEXT NOT NULL, amount DECIMAL(15, 2) NOT NULL, currency currency_type NOT NULL DEFAULT 'MXN', due_date DATE NOT NULL, paid_date DATE, status VARCHAR(50) NOT NULL DEFAULT 'pending', recurrence VARCHAR(50) NOT NULL DEFAULT 'none', recurrence_day INTEGER, payment_method VARCHAR(50), category VARCHAR(100), type VARCHAR(20) DEFAULT 'expense', notes TEXT, follow_up TEXT, attachment_url TEXT, price_change DECIMAL(10, 2), tolerance_days INTEGER DEFAULT 2, recurrence_days INTEGER[], contact_id UUID, payment_destination TEXT, deadline_date DATE, late_justification TEXT, operation_type VARCHAR(50), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 
 DO $$ BEGIN ALTER TABLE transactions ADD COLUMN type VARCHAR(20) DEFAULT 'expense'; EXCEPTION WHEN duplicate_column THEN null; END $$;
+DO $$ BEGIN ALTER TABLE transactions ADD COLUMN tolerance_days INTEGER DEFAULT 2; EXCEPTION WHEN duplicate_column THEN null; END $$;
+DO $$ BEGIN ALTER TABLE transactions ADD COLUMN recurrence_days INTEGER[]; EXCEPTION WHEN duplicate_column THEN null; END $$;
+DO $$ BEGIN ALTER TABLE transactions ADD COLUMN contact_id UUID; EXCEPTION WHEN duplicate_column THEN null; END $$;
+DO $$ BEGIN ALTER TABLE transactions ADD COLUMN payment_destination TEXT; EXCEPTION WHEN duplicate_column THEN null; END $$;
+DO $$ BEGIN ALTER TABLE transactions ADD COLUMN deadline_date DATE; EXCEPTION WHEN duplicate_column THEN null; END $$;
+DO $$ BEGIN ALTER TABLE transactions ADD COLUMN late_justification TEXT; EXCEPTION WHEN duplicate_column THEN null; END $$;
+DO $$ BEGIN ALTER TABLE transactions ADD COLUMN operation_type VARCHAR(50) DEFAULT 'other'; EXCEPTION WHEN duplicate_column THEN null; END $$;
 CREATE TABLE IF NOT EXISTS credit_cards (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE, entity VARCHAR(255) NOT NULL, name VARCHAR(255) NOT NULL, last4 VARCHAR(4) NOT NULL, statement_day INTEGER NOT NULL, due_day INTEGER NOT NULL, current_balance DECIMAL(15, 2) NOT NULL DEFAULT 0, minimum_payment DECIMAL(15, 2) NOT NULL DEFAULT 0, has_msi BOOLEAN NOT NULL DEFAULT false, msi_total DECIMAL(15, 2) NOT NULL DEFAULT 0, interest_rate DECIMAL(5, 2) NOT NULL DEFAULT 0, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS payment_records (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, amount DECIMAL(15, 2) NOT NULL, method payment_method NOT NULL, paid_by VARCHAR(255), paid_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), notes TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS attachments (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, file_name VARCHAR(255) NOT NULL, file_path TEXT NOT NULL, file_type VARCHAR(100) NOT NULL, file_size INTEGER NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
@@ -116,20 +102,104 @@ DO $$ BEGIN
 END $$;
 `;
 
-    await client.query(sql);
+async function tryPgConnection(): Promise<boolean> {
+  const password = process.env.SUPABASE_DB_PASSWORD;
+  if (!password) return false;
 
-    return NextResponse.json({
-      success: true,
-      message: 'Migration completed successfully. All tables, indexes, RLS policies, and triggers created.',
+  const { Client } = await import('pg');
+
+  const configs = [
+    { host: `postgres.${PROJECT_REF}.supabase.co`, port: 6543, label: 'pooler-session' },
+    { host: `db.${PROJECT_REF}.supabase.co`, port: 5432, label: 'direct' },
+    { host: `${PROJECT_REF}.supabase.co`, port: 6543, label: 'pooler-transaction' },
+  ];
+
+  for (const cfg of configs) {
+    const client = new Client({
+      host: cfg.host,
+      port: cfg.port,
+      database: 'postgres',
+      user: 'postgres',
+      password,
+      ssl: { rejectUnauthorized: false },
     });
-  } catch (err) {
-    return NextResponse.json(
-      { error: 'Migration failed', details: err instanceof Error ? err.message : 'Unknown error' },
-      { status: 500 }
-    );
-  } finally {
-    await client.end();
+
+    try {
+      await client.connect();
+      await client.query(MIGRATION_SQL);
+      await client.end();
+      return true;
+    } catch {
+      await client.end().catch(() => {});
+    }
   }
+
+  return false;
+}
+
+async function trySupabaseRestApi(): Promise<boolean> {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) return false;
+
+  const res = await fetch(`${supabaseUrl}/pg/sql/exec`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': serviceRoleKey,
+      'Authorization': `Bearer ${serviceRoleKey}`,
+    },
+    body: JSON.stringify({ query: MIGRATION_SQL }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Supabase SQL API ${res.status}: ${text}`);
+  }
+
+  return true;
+}
+
+export async function POST(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const secret = searchParams.get('secret');
+
+  if (secret !== MIGRATION_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const errors: string[] = [];
+
+  try {
+    const pgOk = await tryPgConnection();
+    if (pgOk) {
+      return NextResponse.json({
+        success: true,
+        message: 'Migration completed successfully via direct connection.',
+      });
+    }
+  } catch (err) {
+    errors.push(`pg: ${err instanceof Error ? err.message : 'unknown'}`);
+  }
+
+  try {
+    const restOk = await trySupabaseRestApi();
+    if (restOk) {
+      return NextResponse.json({
+        success: true,
+        message: 'Migration completed successfully via Supabase REST API.',
+      });
+    }
+  } catch (err) {
+    errors.push(`rest: ${err instanceof Error ? err.message : 'unknown'}`);
+  }
+
+  return NextResponse.json({
+    error: 'All migration methods failed',
+    details: errors.join('; '),
+    hint: 'Set SUPABASE_DB_PASSWORD and/or SUPABASE_SERVICE_ROLE_KEY in Vercel env vars, or run the SQL manually in the Supabase SQL Editor.',
+    sql: MIGRATION_SQL,
+  }, { status: 500 });
 }
 
 export async function GET() {

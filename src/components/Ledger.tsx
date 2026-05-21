@@ -72,11 +72,19 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
   }, [customCategories]);
 
   const allEntities = useMemo(() => {
-    const defaultEnts = Object.entries(ENTITY_LABELS).map(([id, label]) => ({ id, label }));
-    const customEnts = entities
-      .filter(e => e.is_active && !ENTITY_LABELS[e.id])
-      .map(e => ({ id: e.id, label: e.name }));
-    return [...defaultEnts, ...customEnts];
+    const seen = new Set<string>();
+    const result: { id: string; label: string }[] = [];
+    for (const [id, label] of Object.entries(ENTITY_LABELS)) {
+      seen.add(id);
+      result.push({ id, label });
+    }
+    for (const e of entities) {
+      if (e.is_active && !seen.has(e.id)) {
+        seen.add(e.id);
+        result.push({ id: e.id, label: e.name });
+      }
+    }
+    return result;
   }, [entities]);
 
   const generateVirtualProjections = (txs: Transaction[]): Transaction[] => {
@@ -239,14 +247,14 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
     );
   };
 
+  const isIncomeTx = (tx: Transaction) => tx.type === 'income';
+
   const getTypeLabel = (tx: Transaction) => {
-    if (tx.amount < 0) return 'ingreso';
-    return tx.type === 'income' ? 'ingreso' : 'egreso';
+    return isIncomeTx(tx) ? 'ingreso' : 'egreso';
   };
 
   const getTypeAmountColor = (tx: Transaction) => {
-    if (tx.amount < 0) return 'text-emerald-400';
-    return tx.type === 'income' ? 'text-emerald-400' : 'text-slate-300';
+    return isIncomeTx(tx) ? 'text-emerald-400' : 'text-slate-300';
   };
 
   const SortIcon = ({ field }: { field: SortField }) => {
@@ -520,9 +528,13 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.02 }}
-                  onClick={() => onRowClick?.(transaction)}
+                  onClick={() => {
+                    if (transaction.isProjection) return;
+                    onRowClick?.(transaction)
+                  }}
                   className={cn(
-                    'border-b border-slate-800/30 hover:bg-slate-800/30 transition-colors cursor-pointer',
+                    'border-b border-slate-800/30 transition-colors',
+                    transaction.isProjection ? 'opacity-60 cursor-default' : 'hover:bg-slate-800/30 cursor-pointer',
                     urgent && 'bg-red-500/5',
                     transaction.isProjection && 'bg-blue-500/5'
                   )}
@@ -559,16 +571,16 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
                       {categoryLabel}
                     </span>
                   </td>
-                  <td className="p-4">
+                   <td className="p-4">
                     <span className={cn('font-semibold', getTypeAmountColor(transaction))}>
-                      {transaction.amount < 0 ? '+' : '-'}
+                      {isIncomeTx(transaction) ? '+' : '-'}
                       {formatCurrency(Math.abs(transaction.amount))}
                     </span>
                     <span className={cn(
                       'text-xs ml-1 px-1 py-0.5 rounded',
-                      transaction.amount < 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
+                      isIncomeTx(transaction) ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-700 text-slate-400'
                     )}>
-                      {transaction.amount < 0 ? 'ING' : 'EGR'}
+                      {isIncomeTx(transaction) ? 'ING' : 'EGR'}
                     </span>
                   </td>
                   <td className="p-4">

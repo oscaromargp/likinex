@@ -43,6 +43,7 @@ function mapDBToTransaction(db: TransactionDB): Transaction {
     status: db.status as Transaction['status'],
     recurrence: db.recurrence as Transaction['recurrence'],
     recurrence_day: db.recurrence_day || undefined,
+    recurrence_days: db.recurrence_days || undefined,
     payment_method: db.payment_method as Transaction['payment_method'],
     category: db.category as Transaction['category'],
     type: db.type as Transaction['type'],
@@ -50,6 +51,11 @@ function mapDBToTransaction(db: TransactionDB): Transaction {
     follow_up: db.follow_up || undefined,
     attachment_url: db.attachment_url || undefined,
     price_change: db.price_change || undefined,
+    tolerance_days: db.tolerance_days ?? undefined,
+    contact_id: db.contact_id || undefined,
+    payment_destination: db.payment_destination || undefined,
+    deadline_date: db.deadline_date || undefined,
+    late_justification: db.late_justification || undefined,
     created_at: db.created_at,
     updated_at: db.updated_at,
   };
@@ -68,6 +74,7 @@ function mapTransactionToDB(tx: Transaction, userId: string): Omit<TransactionDB
     status: tx.status,
     recurrence: tx.recurrence,
     recurrence_day: tx.recurrence_day || null,
+    recurrence_days: tx.recurrence_days || null,
     payment_method: tx.payment_method || null,
     category: tx.category || null,
     type: tx.type || null,
@@ -75,6 +82,12 @@ function mapTransactionToDB(tx: Transaction, userId: string): Omit<TransactionDB
     follow_up: tx.follow_up || null,
     attachment_url: tx.attachment_url || null,
     price_change: tx.price_change || null,
+    tolerance_days: tx.tolerance_days ?? null,
+    contact_id: tx.contact_id || null,
+    payment_destination: tx.payment_destination || null,
+    deadline_date: tx.deadline_date || null,
+    late_justification: tx.late_justification || null,
+    operation_type: (tx as any).operation_type || null,
   };
 }
 
@@ -392,6 +405,7 @@ function DashboardContent() {
   };
 
   const handleEventClick = (event: CalendarEvent) => {
+    if (event.id.includes('-proj-')) return;
     const transaction = transactions.find(t => t.id === event.id);
     if (transaction) {
       setSelectedTransaction(transaction);

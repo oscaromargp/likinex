@@ -508,9 +508,7 @@ export function generateCEP(transactionId: string, contactId?: string): string {
 }
 
 export function isIncomeTransaction(tx: Transaction): boolean {
-  if (tx.type === 'income') return true;
-  if (tx.amount < 0) return true;
-  return false;
+  return tx.type === 'income';
 }
 
 export function getTransactionAmount(tx: Transaction): { display: number; isIncome: boolean } {

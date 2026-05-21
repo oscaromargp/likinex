@@ -48,7 +48,7 @@ function LandingContent() {
             <Link href="/app?demo=true" className="px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg hover:bg-blue-500/30 transition-colors">
               Modo Demo
             </Link>
-            <Link href="/app" className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors">
+            <Link href="/app?demo=true" className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-medium rounded-lg transition-colors">
               Acceder
             </Link>
           </div>
@@ -64,7 +64,7 @@ function LandingContent() {
             <a href="#demo" className="block text-slate-400 hover:text-white" onClick={() => setMobileMenuOpen(false)}>Demo</a>
             <a href="#faq" className="block text-slate-400 hover:text-white" onClick={() => setMobileMenuOpen(false)}>FAQ</a>
             <Link href="/app?demo=true" className="block px-4 py-2 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-lg text-center">Modo Demo</Link>
-            <Link href="/app" className="block px-4 py-2 bg-blue-500 text-white rounded-lg text-center">Acceder</Link>
+            <Link href="/app?demo=true" className="block px-4 py-2 bg-blue-500 text-white rounded-lg text-center">Acceder</Link>
           </div>
         )}
       </nav>

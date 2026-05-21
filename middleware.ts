@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
 
 const protectedPaths = ['/app'];
 const publicApiPaths = ['/api/notifications', '/api/migrate', '/api/seed'];
@@ -8,17 +7,44 @@ const publicApiPaths = ['/api/notifications', '/api/migrate', '/api/seed'];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Skip middleware entirely for demo mode
+  if (request.nextUrl.searchParams.get('demo') === 'true') {
+    return NextResponse.next({ request });
+  }
+
   const isProtectedPage = protectedPaths.some(
     path => pathname === path || pathname.startsWith(`${path}/`)
   );
 
   const isProtectedApi = pathname.startsWith('/api/') && !publicApiPaths.some(p => pathname.startsWith(p));
 
+  if (!isProtectedPage && !isProtectedApi) {
+    return NextResponse.next({ request });
+  }
+
+  // Auto-redirect to demo mode when Supabase is not configured
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey || supabaseUrl === 'https://placeholder-url.supabase.co') {
+    if (isProtectedPage) {
+      const demoUrl = new URL('/app', request.url);
+      demoUrl.searchParams.set('demo', 'true');
+      if (pathname !== '/app') demoUrl.searchParams.set('from', pathname);
+      return NextResponse.redirect(demoUrl);
+    }
+    if (isProtectedApi) {
+      return NextResponse.json({ error: 'Supabase not configured' }, { status: 503 });
+    }
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
+  const { createServerClient } = await import('@supabase/ssr');
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseKey,
     {
       cookies: {
         getAll() {

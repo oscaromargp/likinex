@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Mail, Lock, User, Eye, EyeOff, ArrowRight, ArrowLeft, CheckCircle, AlertCircle, Info, X, Sparkles } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
 type AuthMode = 'login' | 'register' | 'recoverPassword';
 
@@ -349,15 +350,26 @@ function AuthContent() {
 
               <div className="text-center pt-2">
                 {mode === 'login' && (
-                  <p className="text-slate-500 text-sm">
-                    ¿No tienes cuenta?{' '}
-                    <button
-                      onClick={() => setMode('register')}
-                      className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
-                    >
-                      Regístrate gratis
-                    </button>
-                  </p>
+                  <>
+                    <p className="text-slate-500 text-sm">
+                      ¿No tienes cuenta?{' '}
+                      <button
+                        onClick={() => setMode('register')}
+                        className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+                      >
+                        Regístrate gratis
+                      </button>
+                    </p>
+                    <div className="mt-4 pt-4 border-t border-slate-800">
+                      <Link
+                        href="/app?demo=true"
+                        className="inline-flex items-center gap-2 px-6 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-xl text-sm font-medium transition-all hover:scale-105"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        Probar Modo Demo (sin registro)
+                      </Link>
+                    </div>
+                  </>
                 )}
                 {(mode === 'register' || mode === 'recoverPassword') && (
                   <button
