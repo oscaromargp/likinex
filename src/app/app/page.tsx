@@ -409,7 +409,8 @@ function DashboardContent() {
       payment_method: 'transfer',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
-    };
+    } as Transaction;
+    (newTransaction as any).operation_type = 'other';
     setSelectedTransaction(newTransaction);
     setIsDrawerOpen(true);
   };
@@ -428,7 +429,8 @@ function DashboardContent() {
       payment_method: 'transfer',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
-    };
+    } as Transaction;
+    (newTransaction as any).operation_type = 'other';
     setSelectedTransaction(newTransaction);
     setIsDrawerOpen(true);
   };
@@ -833,6 +835,7 @@ function DashboardContent() {
               >
                 <Contacts
                   contacts={contacts}
+                  transactions={transactions}
                   onAddContact={handleAddContact}
                   onUpdateContact={handleUpdateContact}
                   onDeleteContact={handleDeleteContact}

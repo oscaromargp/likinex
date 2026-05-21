@@ -2,11 +2,12 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar, DollarSign, FileText, Clock, CreditCard, Paperclip, Save, Upload, Trash2, Eye, Download, Image as ImageIcon, Edit3, Plus, History, Landmark, Check, Copy, User, Search, ChevronDown } from 'lucide-react';
+import { X, Calendar, DollarSign, FileText, Clock, CreditCard, Paperclip, Save, Upload, Trash2, Eye, Download, Image as ImageIcon, Edit3, Plus, History, Landmark, Check, Copy, User, Search, ChevronDown, Printer } from 'lucide-react';
 import { Transaction, TransactionStatus, PaymentMethod, RecurrenceType, Contact, ENTITY_LABELS, STATUS_LABELS, Currency, CURRENCY_SYMBOLS, convertCurrency, calculatePunctuality, calculateConsecutiveOnTime, getScoreLabel, Attachment, EntityConfig, DEFAULT_ENTITIES, getEntityIcon, getEntityLabel, CATEGORY_LABELS, Category, BANKS_CATALOG, Bank, PAYMENT_ICONS, STATUS_ICONS, TYPE_ICONS, RECURRENCE_ICONS } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import RecurrenceModal from './RecurrenceModal';
+import ReceiptReport from './ReceiptReport';
 
 const CURRENCIES: Currency[] = ['MXN', 'USD', 'BTC', 'ETH', 'USDT'];
 const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string }[] = [
@@ -27,6 +28,16 @@ const RECURRENCE_OPTIONS: { value: RecurrenceType; label: string; icon: string }
   { value: 'yearly', label: 'Anual', icon: '🎆' },
   { value: 'triennial', label: 'Trienal', icon: '📅' }
 ];
+
+const OPERATION_TYPE_LABELS: Record<string, string> = {
+  service_fixed: '📋 Servicio Fijo',
+  service_variable: '🔧 Servicio Variable',
+  provider: '🏢 Proveedor',
+  credit_card: '💳 Tarjeta de Crédito',
+  payroll: '👥 Nómina',
+  transfer: '🔄 Traspaso',
+  other: '📦 Otro',
+};
 
 const getFileIcon = (type: string) => {
   if (type.startsWith('image/')) return ImageIcon;
@@ -101,6 +112,7 @@ export default function SideDrawer({
     recurrence: 'none' as RecurrenceType,
     recurrence_days: [1, 15] as number[],
     type: 'expense' as 'income' | 'expense',
+    operation_type: 'other' as string,
     tolerance_days: 2 as number,
     bank_id: '' as string,
     deadline_date: '',
@@ -122,6 +134,7 @@ export default function SideDrawer({
   
   const [showRecurrenceModal, setShowRecurrenceModal] = useState(false);
   const [pendingDateChange, setPendingDateChange] = useState<{ newDate: string; originalDate: string } | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -145,6 +158,7 @@ export default function SideDrawer({
         recurrence: transaction.recurrence || 'none',
         recurrence_days: (transaction as any).recurrence_days || [1, 15],
         type: transaction.type || 'expense',
+        operation_type: (transaction as any).operation_type || 'other',
         tolerance_days: transaction.tolerance_days ?? 2,
         bank_id: (transaction as any).bank_id || '',
         deadline_date: transaction.deadline_date || '',
@@ -676,6 +690,43 @@ const handleSave = () => {
               {/* TAB 1: DETAILS */}
               {activeTab === 'details' && (
                 <div className="space-y-5">
+                  {/* Tipo de Operación */}
+                  <div className="p-3.5 bg-slate-800/40 border border-slate-800/60 rounded-xl">
+                    <p className="text-[10px] text-slate-400 mb-1.5 font-semibold uppercase tracking-wider">Tipo de Operación</p>
+                    {isEditing ? (
+                      <div className="grid grid-cols-2 gap-1.5 mt-1">
+                        {[
+                          { value: 'service_fixed', label: '📋 Servicio Fijo', desc: 'Internet, luz, agua' },
+                          { value: 'service_variable', label: '🔧 Servicio Variable', desc: 'Plomería, electricista' },
+                          { value: 'provider', label: '🏢 Proveedor', desc: 'Insumos, materiales' },
+                          { value: 'credit_card', label: '💳 Tarjeta Crédito', desc: 'Pago de TDC' },
+                          { value: 'payroll', label: '👥 Nómina', desc: 'Pagos a empleados' },
+                          { value: 'transfer', label: '🔄 Traspaso', desc: 'Entre cuentas' },
+                          { value: 'other', label: '📦 Otro', desc: 'Gastos varios' },
+                        ].map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setEditForm(f => ({ ...f, operation_type: opt.value }))}
+                            className={cn(
+                              "py-2 px-2 rounded-lg text-xs font-semibold border transition-all text-left",
+                              editForm.operation_type === opt.value
+                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                                : "bg-slate-800/50 text-slate-400 border-transparent hover:text-white hover:bg-slate-700/50"
+                            )}
+                          >
+                            <span className="block">{opt.label}</span>
+                            <span className="block text-[9px] opacity-70 font-normal">{opt.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-white">
+                        {OPERATION_TYPE_LABELS[(transaction as any).operation_type as keyof typeof OPERATION_TYPE_LABELS] || (transaction as any).operation_type || 'Sin clasificar'}
+                      </p>
+                    )}
+                  </div>
+
                   {/* Tipo de Movimiento: Entrada / Salida */}
                   <div className="p-3.5 bg-slate-800/40 border border-slate-800/60 rounded-xl">
                     <p className="text-[10px] text-slate-400 mb-1.5 font-semibold uppercase tracking-wider">Tipo de Movimiento</p>
@@ -1426,13 +1477,22 @@ const handleSave = () => {
                     Guardar Cambios
                   </button>
                 ) : (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    className="flex-1 py-3 bg-slate-800 hover:bg-slate-750 text-slate-200 font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                    Editar Detalles
-                  </button>
+                  <>
+                    <button
+                      onClick={() => setShowReceipt(true)}
+                      className="px-4 py-3 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                      title="Imprimir comprobante"
+                    >
+                      <Printer className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="flex-1 py-3 bg-slate-800 hover:bg-slate-750 text-slate-200 font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                      Editar Detalles
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -1532,6 +1592,13 @@ const handleSave = () => {
           onUpdateThis={handleRecurrenceUpdateThis}
           onUpdateAll={handleRecurrenceUpdateAll}
           onCancel={handleRecurrenceCancel}
+        />
+      )}
+
+      {showReceipt && (
+        <ReceiptReport
+          transaction={{ ...transaction, amount: Math.abs(transaction.amount), type: transaction.type || 'expense' } as any}
+          onClose={() => setShowReceipt(false)}
         />
       )}
     </AnimatePresence>
