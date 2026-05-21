@@ -30,14 +30,14 @@ CREATE TABLE IF NOT EXISTS payment_records (id UUID PRIMARY KEY DEFAULT uuid_gen
 CREATE TABLE IF NOT EXISTS attachments (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE, file_name VARCHAR(255) NOT NULL, file_path TEXT NOT NULL, file_type VARCHAR(100) NOT NULL, file_size INTEGER NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 CREATE TABLE IF NOT EXISTS notifications_log (id UUID PRIMARY KEY DEFAULT uuid_generate_v4(), type VARCHAR(50) NOT NULL, title VARCHAR(255) NOT NULL, message TEXT NOT NULL, priority VARCHAR(20) NOT NULL DEFAULT 'medium', phone VARCHAR(20), user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL, transaction_id UUID, status VARCHAR(20) NOT NULL DEFAULT 'sent', sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_entities_user_id ON entities(user_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_categories_user_id ON categories(user_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_transactions_status ON transactions(user_id, status);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_transactions_due_date ON transactions(user_id, due_date);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_credit_cards_user_id ON credit_cards(user_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_payment_records_transaction ON payment_records(transaction_id);
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notifications_user_id ON notifications_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_entities_user_id ON entities(user_id);
+CREATE INDEX IF NOT EXISTS idx_categories_user_id ON categories(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_transactions_status ON transactions(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_transactions_due_date ON transactions(user_id, due_date);
+CREATE INDEX IF NOT EXISTS idx_credit_cards_user_id ON credit_cards(user_id);
+CREATE INDEX IF NOT EXISTS idx_payment_records_transaction ON payment_records(transaction_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications_log(user_id);
 
 ALTER TABLE entities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
