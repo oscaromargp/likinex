@@ -142,19 +142,52 @@ async function trySupabaseRestApi(): Promise<boolean> {
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceRoleKey) return false;
 
-  const res = await fetch(`${supabaseUrl}/pg/sql/exec`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': serviceRoleKey,
-      'Authorization': `Bearer ${serviceRoleKey}`,
-    },
-    body: JSON.stringify({ query: MIGRATION_SQL }),
-  });
+  const paths = [
+    '/pg/sql/exec',
+    '/api/sql',
+    '/sql/v1/sql',
+    '/rest/v1/rpc/pg_exec_sql',
+    '/rest/v1/',
+  ];
+
+  for (const path of paths) {
+    const url = `${supabaseUrl}${path}`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': serviceRoleKey,
+        'Authorization': `Bearer ${serviceRoleKey}`,
+      },
+      body: JSON.stringify({ query: MIGRATION_SQL }),
+    });
+
+    if (res.ok) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+async function tryManagementApi(): Promise<boolean> {
+  const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
+  if (!accessToken) return false;
+
+  const res = await fetch(
+    `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/sql`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ sql: MIGRATION_SQL }),
+    }
+  );
 
   if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Supabase SQL API ${res.status}: ${text}`);
+    throw new Error(`Management API ${res.status}: ${await res.text()}`);
   }
 
   return true;
@@ -194,10 +227,22 @@ export async function POST(request: NextRequest) {
     errors.push(`rest: ${err instanceof Error ? err.message : 'unknown'}`);
   }
 
+  try {
+    const mgmtOk = await tryManagementApi();
+    if (mgmtOk) {
+      return NextResponse.json({
+        success: true,
+        message: 'Migration completed successfully via Supabase Management API.',
+      });
+    }
+  } catch (err) {
+    errors.push(`mgmt: ${err instanceof Error ? err.message : 'unknown'}`);
+  }
+
   return NextResponse.json({
     error: 'All migration methods failed',
     details: errors.join('; '),
-    hint: 'Set SUPABASE_DB_PASSWORD and/or SUPABASE_SERVICE_ROLE_KEY in Vercel env vars, or run the SQL manually in the Supabase SQL Editor.',
+    hint: 'Set SUPABASE_DB_PASSWORD, SUPABASE_SERVICE_ROLE_KEY and/or SUPABASE_ACCESS_TOKEN in Vercel env vars, or run the SQL manually in the Supabase SQL Editor.',
     sql: MIGRATION_SQL,
   }, { status: 500 });
 }
