@@ -175,14 +175,14 @@ async function tryManagementApi(): Promise<boolean> {
   if (!accessToken) return false;
 
   const res = await fetch(
-    `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/sql`,
+    `https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`,
     {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({ sql: MIGRATION_SQL }),
+      body: JSON.stringify({ query: MIGRATION_SQL }),
     }
   );
 
