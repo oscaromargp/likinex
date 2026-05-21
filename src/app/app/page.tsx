@@ -16,6 +16,8 @@ import RiskToleranceEngine from '@/components/RiskToleranceEngine';
 import CashFlowForecast from '@/components/CashFlowForecast';
 import NotificationsPanel from '@/components/NotificationsPanel';
 import Contacts from '@/components/Contacts';
+import WeeklyPulse from '@/components/WeeklyPulse';
+import AccountBalances from '@/components/AccountBalances';
 import { Transaction, CalendarEvent, EntityConfig, DEFAULT_ENTITIES, Contact } from '@/types';
 import { mockCreditCards } from '@/lib/mockData';
 import { calculateMetrics, generateCalendarEvents } from '@/lib/userData';
@@ -43,6 +45,7 @@ function mapDBToTransaction(db: TransactionDB): Transaction {
     recurrence_day: db.recurrence_day || undefined,
     payment_method: db.payment_method as Transaction['payment_method'],
     category: db.category as Transaction['category'],
+    type: db.type as Transaction['type'],
     notes: db.notes || undefined,
     follow_up: db.follow_up || undefined,
     attachment_url: db.attachment_url || undefined,
@@ -67,6 +70,7 @@ function mapTransactionToDB(tx: Transaction, userId: string): Omit<TransactionDB
     recurrence_day: tx.recurrence_day || null,
     payment_method: tx.payment_method || null,
     category: tx.category || null,
+    type: tx.type || null,
     notes: tx.notes || null,
     follow_up: tx.follow_up || null,
     attachment_url: tx.attachment_url || null,
@@ -140,6 +144,7 @@ function DashboardContent() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [printFilters, setPrintFilters] = useState<{ dateRange: { start: string | null, end: string | null }, entity: string, category: string, status: string, type: string }>({ dateRange: { start: null, end: null }, entity: 'all', category: 'all', status: 'all', type: 'all' });
   const [showDropConfirm, setShowDropConfirm] = useState<{ eventId: string; oldDate: string; newDate: string; toleranceDays: number } | null>(null);
+  const [selectedEntity, setSelectedEntity] = useState<string | undefined>(undefined);
 
   // Estados locales para el modo Demo interactivo
   const [demoTransactions, setDemoTransactions] = useState<Transaction[]>([]);
@@ -719,6 +724,21 @@ function DashboardContent() {
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-8"
               >
+                {/* Pulso Semanal + Saldos por Cuenta */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <WeeklyPulse
+                    transactions={transactions}
+                    selectedEntity={selectedEntity}
+                    entities={entities}
+                  />
+                  <AccountBalances
+                    transactions={transactions}
+                    entities={entities}
+                    onEntitySelect={(id) => setSelectedEntity(selectedEntity === id ? undefined : id)}
+                  />
+                </div>
+
+                {/* Métricas de Liquidez */}
                 <div>
                   <h3 className="text-xl font-bold text-white mb-4">Métricas de Liquidez</h3>
                   <MetricsCards metrics={metrics} />

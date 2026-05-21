@@ -16,6 +16,7 @@ export interface TransactionDB {
   recurrence_day: number | null;
   payment_method: string | null;
   category: string | null;
+  type: string | null;
   notes: string | null;
   follow_up: string | null;
   attachment_url: string | null;
