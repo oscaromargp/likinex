@@ -6,6 +6,7 @@ import { Wallet, TrendingUp, TrendingDown, ChevronDown, ChevronUp } from 'lucide
 import { Transaction, EntityConfig } from '@/types';
 import { getAccountBalances, calcBalance, fmtMXN, currentPeriod } from '@/lib/finance-utils';
 import { cn } from '@/lib/utils';
+import { DonutChart } from './charts/DonutChart';
 
 interface AccountBalancesProps {
   transactions: Transaction[];
@@ -44,6 +45,19 @@ export default function AccountBalances({ transactions, entities, onEntitySelect
             <p className="text-slate-500 text-xs">{getMonthName(period)}</p>
           </div>
         </div>
+      </div>
+
+      {/* Donut - Ingresos vs Egresos */}
+      <div className="flex justify-center py-2">
+        <DonutChart
+          size="sm"
+          data={[
+            { name: 'Ingresos', value: totalBal.income, color: '#10b981' },
+            { name: 'Egresos', value: totalBal.expense, color: '#ef4444' },
+          ]}
+          centerLabel="Disponible"
+          centerValue={fmtMXN(totalBal.net)}
+        />
       </div>
 
       {/* Total */}

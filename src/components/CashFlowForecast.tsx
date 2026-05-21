@@ -6,6 +6,7 @@ import { TrendingDown, Calendar, AlertTriangle, DollarSign } from 'lucide-react'
 import { Transaction, LiquidityMetrics } from '@/types';
 import { formatCurrency, formatDateInput } from '@/lib/utils';
 import { subDays, addDays, differenceInDays, parseISO } from 'date-fns';
+import { CashFlowAreaChart } from './charts/CashFlowAreaChart';
 
 interface CashFlowForecastProps {
   transactions: Transaction[];
@@ -168,56 +169,16 @@ export default function CashFlowForecast({
       </div>
 
       <div className="bg-slate-800/30 rounded-xl p-4">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-2">
           <h4 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
             Proyección de Balance
           </h4>
-          <div className="flex items-center gap-4 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-emerald-500 rounded-sm" />
-              <span className="text-slate-400">Positivo</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-red-500 rounded-sm" />
-              <span className="text-slate-400">Negativo</span>
-            </div>
-          </div>
         </div>
-        
-        <div className="relative h-32">
-          <div className="absolute inset-0 flex items-end justify-between gap-1">
-            {forecast.forecastByDate.filter((_, i) => i % 3 === 0).map((day, idx) => {
-              const maxBalance = Math.max(...forecast.forecastByDate.map(f => f.balance), 1);
-              const height = Math.max((day.balance / maxBalance) * 100, 5);
-              const isNegative = day.balance < 0;
-              
-              return (
-                <motion.div
-                  key={day.date}
-                  initial={{ height: 0 }}
-                  animate={{ height: `${height}%` }}
-                  transition={{ delay: idx * 0.02 }}
-                  className={`flex-1 rounded-t-sm ${
-                    isNegative ? 'bg-red-500/60' : 'bg-emerald-500/60'
-                  }`}
-                  title={`${formatDateInput(day.date)}: ${formatCurrency(day.balance)}`}
-                />
-              );
-            })}
-          </div>
-          
-          <div className="absolute bottom-0 left-0 right-0 h-px bg-slate-700" />
-          <div 
-            className="absolute bottom-0 left-0 h-px bg-amber-500/50 border border-dashed" 
-            style={{ width: `${((forecast.lowBalanceThreshold / Math.max(...forecast.forecastByDate.map(f => f.balance), 1)) * 100)}%` }}
-          />
-        </div>
-        
-        <div className="flex justify-between mt-2 text-xs text-slate-500">
-          <span>Hoy</span>
-          <span>+{Math.floor(daysAhead / 2)} dias</span>
-          <span>+{daysAhead} dias</span>
-        </div>
+        <CashFlowAreaChart
+          data={forecast.forecastByDate.map(d => ({ date: new Date(d.date + 'T12:00:00'), value: d.balance }))}
+          color="text-emerald-400"
+          fillColor="text-emerald-200"
+        />
       </div>
 
       {minBalance < 0 && (
