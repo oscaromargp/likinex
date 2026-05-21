@@ -70,9 +70,19 @@ export default function PDFReport({
     <>
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          .report-container, .report-container * { visibility: visible; }
-          .report-container { position: absolute; left: 0; top: 0; width: 100%; background: white; color: black; }
+          body * { visibility: hidden !important; }
+          .print-only, .print-only * { visibility: visible !important; }
+          .print-only { 
+            position: absolute !important; 
+            left: 0 !important; 
+            top: 0 !important; 
+            width: 100% !important; 
+            background: white !important; 
+            color: black !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .no-print { display: none !important; }
           @page { margin: 10mm; size: A4; }
         }
       `}</style>

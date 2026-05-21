@@ -489,18 +489,36 @@ function generateProjections(transaction: Transaction, monthsAhead: number): { d
 
   switch (transaction.recurrence) {
     case 'weekly': {
-      currentDate.setDate(currentDate.getDate() + 7);
-      while (currentDate <= limitDate) {
-        projections.push({ date: formatDate(currentDate) });
-        currentDate.setDate(currentDate.getDate() + 7);
+      const targetDays = transaction.recurrence_days && transaction.recurrence_days.length > 0
+        ? transaction.recurrence_days
+        : [0];
+
+      for (let d = 1; d <= monthsAhead * 7 + 7; d++) {
+        const projDate = new Date(baseDate);
+        projDate.setDate(projDate.getDate() + d);
+        if (projDate > baseDate && projDate <= limitDate) {
+          if (targetDays.includes(projDate.getDay())) {
+            projections.push({ date: formatDate(projDate) });
+          }
+        }
       }
       break;
     }
     case 'monthly': {
-      currentDate.setMonth(currentDate.getMonth() + 1);
-      while (currentDate <= limitDate) {
-        projections.push({ date: formatDate(currentDate) });
-        currentDate.setMonth(currentDate.getMonth() + 1);
+      const targetDays = transaction.recurrence_days && transaction.recurrence_days.length > 0
+        ? transaction.recurrence_days
+        : [baseDate.getDate()];
+
+      for (let m = 0; m <= monthsAhead + 1; m++) {
+        const targetMonth = new Date(baseDate.getFullYear(), baseDate.getMonth() + m, 1);
+        for (const day of targetDays) {
+          const daysInMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate();
+          const actualDay = Math.min(day, daysInMonth);
+          const projDate = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), actualDay);
+          if (projDate > baseDate && projDate <= limitDate) {
+            projections.push({ date: formatDate(projDate) });
+          }
+        }
       }
       break;
     }

@@ -363,17 +363,22 @@ function DashboardContent() {
     }
     if (!user) return;
 
-    if (Array.isArray(updated)) {
-      for (const tx of updated) {
-        await createTransaction.mutateAsync(mapTransactionToDB(tx, user.id));
-      }
-    } else {
-      if (updated.id.startsWith('new_')) {
-        await createTransaction.mutateAsync(mapTransactionToDB(updated, user.id));
+    try {
+      if (Array.isArray(updated)) {
+        for (const tx of updated) {
+          await createTransaction.mutateAsync(mapTransactionToDB(tx, user.id));
+        }
       } else {
-        await updateTransaction.mutateAsync({ id: updated.id, ...mapTransactionToDB(updated, user.id) });
-        setSelectedTransaction(updated);
+        if (updated.id.startsWith('new_')) {
+          await createTransaction.mutateAsync(mapTransactionToDB(updated, user.id));
+        } else {
+          await updateTransaction.mutateAsync({ id: updated.id, ...mapTransactionToDB(updated, user.id) });
+          setSelectedTransaction(updated);
+        }
       }
+    } catch (err) {
+      console.error('Error saving transaction:', err);
+      alert('Error al guardar: ' + (err instanceof Error ? err.message : 'Error desconocido. Intenta correr la migración en /api/migrate'));
     }
   };
 
@@ -523,8 +528,8 @@ function DashboardContent() {
     setShowPDFReport(true);
     setTimeout(() => {
       window.print();
-      setShowPDFReport(false);
-    }, 300);
+      setTimeout(() => setShowPDFReport(false), 500);
+    }, 800);
   };
 
   const handleAddCategory = async (category: string) => {

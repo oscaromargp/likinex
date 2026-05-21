@@ -39,6 +39,38 @@ const OPERATION_TYPE_LABELS: Record<string, string> = {
   other: '📦 Otro',
 };
 
+function getNextPaymentDate(dueDate: string, recurrence: string, recurrenceDays?: number[]): string {
+  const base = new Date(dueDate + 'T12:00:00');
+  const now = new Date();
+  const day = recurrenceDays?.[0] || base.getDate();
+
+  if (recurrence === 'monthly') {
+    let next = new Date(now.getFullYear(), now.getMonth(), day);
+    if (next <= now) {
+      next = new Date(now.getFullYear(), now.getMonth() + 1, day);
+    }
+    return next.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  if (recurrence === 'bimonthly') {
+    let next = new Date(now.getFullYear(), now.getMonth(), day);
+    if (next <= now) {
+      next = new Date(now.getFullYear(), now.getMonth() + 2, day);
+    }
+    return next.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  if (recurrence === 'quarterly') {
+    let next = new Date(now.getFullYear(), now.getMonth(), day);
+    if (next <= now) {
+      next = new Date(now.getFullYear(), now.getMonth() + 3, day);
+    }
+    return next.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
+  return base.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
 const getFileIcon = (type: string) => {
   if (type.startsWith('image/')) return ImageIcon;
   if (type === 'application/pdf') return FileText;
@@ -1101,6 +1133,183 @@ const handleSave = () => {
                       </>
                     )}
                   </div>
+
+                  {/* Dynamic Fields Based on Operation Type */}
+                  {isEditing && editForm.operation_type === 'service_fixed' && (
+                    <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl space-y-3">
+                      <p className="text-[10px] text-indigo-400 uppercase font-semibold tracking-wider">⚙️ Configuración de Servicio Fijo</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Recurrencia</label>
+                          <select
+                            value={editForm.recurrence}
+                            onChange={e => setEditForm(f => ({ ...f, recurrence: e.target.value as RecurrenceType }))}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                          >
+                            <option value="monthly">Mensual</option>
+                            <option value="bimonthly">Bimestral</option>
+                            <option value="quarterly">Trimestral</option>
+                            <option value="yearly">Anual</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Día de pago</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            value={editForm.recurrence_days?.[0] || new Date(editForm.due_date).getDate()}
+                            onChange={e => setEditForm(f => ({ ...f, recurrence_days: [Number(e.target.value)] }))}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                            placeholder="Ej: 7"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-indigo-300/70">
+                        📅 Próximo pago: {getNextPaymentDate(editForm.due_date, editForm.recurrence, editForm.recurrence_days)}
+                      </p>
+                    </div>
+                  )}
+
+                  {isEditing && editForm.operation_type === 'provider' && (
+                    <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl space-y-3">
+                      <p className="text-[10px] text-amber-400 uppercase font-semibold tracking-wider">🏢 Condiciones del Proveedor</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Días de crédito</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="90"
+                            value={editForm.tolerance_days}
+                            onChange={e => setEditForm(f => ({ ...f, tolerance_days: Number(e.target.value) }))}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                            placeholder="Ej: 15"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Fecha límite de pago</label>
+                          <input
+                            type="date"
+                            value={editForm.deadline_date || ''}
+                            onChange={e => setEditForm(f => ({ ...f, deadline_date: e.target.value }))}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-amber-300/70">
+                        💡 Puedes negociar plazos con proveedores. Define días de crédito y fecha límite.
+                      </p>
+                    </div>
+                  )}
+
+                  {isEditing && editForm.operation_type === 'credit_card' && (
+                    <div className="p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl space-y-3">
+                      <p className="text-[10px] text-rose-400 uppercase font-semibold tracking-wider">💳 Configuración de Tarjeta de Crédito</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Día de corte</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            placeholder="Ej: 15"
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Día de pago</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            value={new Date(editForm.due_date).getDate()}
+                            onChange={e => {
+                              const d = new Date(editForm.due_date);
+                              d.setDate(Number(e.target.value));
+                              setEditForm(f => ({ ...f, due_date: d.toISOString().split('T')[0] }));
+                            }}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+                      <div className="p-2 bg-rose-500/20 rounded-lg">
+                        <p className="text-xs text-rose-300">
+                          ⚠️ No uses la tarjeta después del día de corte. El pago debe hacerse antes del día de pago para evitar intereses.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {isEditing && editForm.operation_type === 'payroll' && (
+                    <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-xl space-y-3">
+                      <p className="text-[10px] text-blue-400 uppercase font-semibold tracking-wider">👥 Configuración de Nómina</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Frecuencia de pago</label>
+                          <select
+                            value={editForm.recurrence}
+                            onChange={e => setEditForm(f => ({ ...f, recurrence: e.target.value as RecurrenceType }))}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                          >
+                            <option value="weekly">Semanal</option>
+                            <option value="bimonthly">Quincenal</option>
+                            <option value="monthly">Mensual</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Días de tolerancia</label>
+                          <input
+                            type="number"
+                            min="0"
+                            max="10"
+                            value={editForm.tolerance_days}
+                            onChange={e => setEditForm(f => ({ ...f, tolerance_days: Number(e.target.value) }))}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+                      <p className="text-xs text-blue-300/70">
+                        💡 La nómina puede tener flexibilidad de 2-3 días. Define la tolerancia aquí.
+                      </p>
+                    </div>
+                  )}
+
+                  {isEditing && editForm.operation_type === 'transfer' && (
+                    <div className="p-4 bg-cyan-500/10 border border-cyan-500/20 rounded-xl space-y-3">
+                      <p className="text-[10px] text-cyan-400 uppercase font-semibold tracking-wider">🔄 Traspaso entre Cuentas</p>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Cuenta origen</label>
+                          <select
+                            value={editForm.entity}
+                            onChange={e => setEditForm(f => ({ ...f, entity: e.target.value }))}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                          >
+                            {DEFAULT_ENTITIES.map(ent => (
+                              <option key={ent.id} value={ent.id}>{ent.icon} {ent.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs text-slate-400 block mb-1">Cuenta destino</label>
+                          <select
+                            value={editForm.payment_destination || ''}
+                            onChange={e => setEditForm(f => ({ ...f, payment_destination: e.target.value }))}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                          >
+                            <option value="">Seleccionar...</option>
+                            {DEFAULT_ENTITIES.filter(e => e.id !== editForm.entity).map(ent => (
+                              <option key={ent.id} value={ent.id}>{ent.icon} {ent.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                      <p className="text-xs text-cyan-300/70">
+                        🔄 Los traspasos no afectan el balance total, solo mueven saldo entre cuentas.
+                      </p>
+                    </div>
+                  )}
 
                   {/* MSI Checkbox */}
                   {isEditing && transaction.id.startsWith('new_') && (
