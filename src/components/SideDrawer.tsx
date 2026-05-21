@@ -931,11 +931,17 @@ const handleSave = () => {
                           onChange={e => {
                             const cid = e.target.value;
                             const contact = contacts.find(c => c.id === cid);
+                            const firstAccount = contact?.bank_accounts?.[0];
                             setEditForm(f => ({
                               ...f,
                               contact_id: cid,
                               payment_method: contact?.payment_method_preferred || f.payment_method,
-                              payment_destination: contact ? `${contact.bank_name || ''} - CLABE: ${contact.bank_clabe || contact.bank_account || ''}` : f.payment_destination
+                              payment_destination: firstAccount 
+                                ? `${firstAccount.bank_name} - ${firstAccount.clabe || firstAccount.account_number || ''}`
+                                : contact 
+                                  ? `${contact.bank_name || ''} - CLABE: ${contact.bank_clabe || contact.bank_account || ''}`.trim()
+                                  : f.payment_destination,
+                              bank_id: firstAccount?.id || ''
                             }));
                           }}
                           className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50"
@@ -945,6 +951,29 @@ const handleSave = () => {
                             <option key={c.id} value={c.id}>{c.name}</option>
                           ))}
                         </select>
+
+                        {selectedContact && selectedContact.bank_accounts && selectedContact.bank_accounts.length > 1 && (
+                          <select
+                            value={editForm.bank_id}
+                            onChange={e => {
+                              const account = selectedContact.bank_accounts?.find(a => a.id === e.target.value);
+                              setEditForm(f => ({
+                                ...f,
+                                bank_id: e.target.value,
+                                payment_destination: account 
+                                  ? `${account.bank_name} - ${account.clabe || account.account_number || ''}`
+                                  : f.payment_destination
+                              }));
+                            }}
+                            className="w-full p-2.5 bg-slate-800 border border-slate-700 rounded-xl text-xs text-white focus:outline-none focus:border-emerald-500/50"
+                          >
+                            {selectedContact.bank_accounts.map(a => (
+                              <option key={a.id} value={a.id}>
+                                {a.bank_name} - {a.clabe || a.account_number || ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                         
                         <input
                           type="text"
