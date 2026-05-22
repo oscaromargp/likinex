@@ -3,7 +3,7 @@ export interface TransactionBase {
   description: string;
   amount: number;
   due_date: string;
-  type?: 'income' | 'expense';
+  type?: string;
   entity?: string;
   category?: string;
   status?: string;
@@ -108,9 +108,15 @@ export function getTransactions(
   }
 
   if (options?.type === 'income') {
-    filtered = filtered.filter(t => t.type === 'income' || t.amount < 0);
+    filtered = filtered.filter(t => {
+      if (t.type) return t.type === 'income';
+      return t.amount < 0;
+    });
   } else if (options?.type === 'expense') {
-    filtered = filtered.filter(t => t.type === 'expense' || t.amount > 0);
+    filtered = filtered.filter(t => {
+      if (t.type) return t.type === 'expense';
+      return t.amount > 0;
+    });
   }
 
   return filtered.sort((a, b) => a.due_date.localeCompare(b.due_date));
@@ -130,7 +136,7 @@ export function calcBalance(
   let expense = 0;
 
   filtered.forEach(t => {
-    const isIncome = t.type === 'income' || t.amount < 0;
+    const isIncome = t.type ? t.type === 'income' : t.amount < 0;
     const absAmount = Math.abs(t.amount);
     if (isIncome) {
       income += absAmount;
@@ -163,7 +169,7 @@ export function buildRunningBalance(
   const entries: RunningBalanceEntry[] = [];
 
   filtered.forEach(t => {
-    const isIncome = t.type === 'income' || t.amount < 0;
+    const isIncome = t.type ? t.type === 'income' : t.amount < 0;
     const absAmount = Math.abs(t.amount);
     balance += isIncome ? absAmount : -absAmount;
 

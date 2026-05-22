@@ -2,16 +2,18 @@
 
 import { useState, useEffect, Suspense, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutDashboard, Calendar, FileText, Settings, Plus, Bell, LogOut, User, Users } from 'lucide-react';
-import { Icon } from '@iconify/react';
+import { motion } from 'framer-motion';
 import CalendarComponent from '@/components/Calendar';
+import { DashboardSidebar } from '@/components/dashboard/DashboardSidebar';
+import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
+import { EntitySelector } from '@/components/dashboard/EntitySelector';
+import { DropConfirmModal } from '@/components/dashboard/DropConfirmModal';
 import Ledger from '@/components/Ledger';
 import SideDrawer from '@/components/SideDrawer';
 import PDFReport from '@/components/PDFReport';
 import MetricsCards from '@/components/MetricsCards';
 import SettingsComponent from '@/components/Settings';
-import CreditCardEngine from '@/components/CreditCardEngine';
+import CreditCardManager from '@/components/CreditCardManager';
 import RiskToleranceEngine from '@/components/RiskToleranceEngine';
 import CashFlowForecast from '@/components/CashFlowForecast';
 import NotificationsPanel from '@/components/NotificationsPanel';
@@ -19,8 +21,7 @@ import Contacts from '@/components/Contacts';
 import WeeklyPulse from '@/components/WeeklyPulse';
 import AccountBalances from '@/components/AccountBalances';
 import { Transaction, CalendarEvent, EntityConfig, DEFAULT_ENTITIES, Contact } from '@/types';
-import { mockCreditCards } from '@/lib/mockData';
-import { calculateMetrics, generateCalendarEvents } from '@/lib/userData';
+import { calculateMetrics, generateCalendarEvents, userTransactions } from '@/lib/userData';
 import { getSmartAlerts } from '@/components/RiskToleranceEngine';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,8 @@ function mapDBToTransaction(db: TransactionDB): Transaction {
     template_id: db.template_id || undefined,
     user_id: db.user_id,
     entity: db.entity,
+    source_entity: db.source_entity || db.entity,
+    destination_entity: db.destination_entity || undefined,
     description: db.description,
     amount: db.amount,
     due_date: db.due_date,
@@ -44,6 +47,9 @@ function mapDBToTransaction(db: TransactionDB): Transaction {
     recurrence: db.recurrence as Transaction['recurrence'],
     recurrence_day: db.recurrence_day || undefined,
     recurrence_days: db.recurrence_days || undefined,
+    recurrence_days_of_month: db.recurrence_days_of_month || undefined,
+    recurrence_end_date: db.recurrence_end_date || undefined,
+    recurrence_count: db.recurrence_count || undefined,
     payment_method: db.payment_method as Transaction['payment_method'],
     category: db.category as Transaction['category'],
     type: db.type as Transaction['type'],
@@ -66,6 +72,8 @@ function mapTransactionToDB(tx: Transaction, userId: string): Omit<TransactionDB
     user_id: userId,
     template_id: tx.template_id || null,
     entity: tx.entity,
+    source_entity: tx.source_entity || tx.entity || null,
+    destination_entity: tx.destination_entity || null,
     description: tx.description,
     amount: tx.amount,
     currency: 'MXN',
@@ -75,6 +83,9 @@ function mapTransactionToDB(tx: Transaction, userId: string): Omit<TransactionDB
     recurrence: tx.recurrence,
     recurrence_day: tx.recurrence_day || null,
     recurrence_days: tx.recurrence_days || null,
+    recurrence_days_of_month: tx.recurrence_days_of_month || null,
+    recurrence_end_date: tx.recurrence_end_date || null,
+    recurrence_count: tx.recurrence_count || null,
     payment_method: tx.payment_method || null,
     category: tx.category || null,
     type: tx.type || null,
@@ -185,21 +196,21 @@ function DashboardContent() {
       const savedTx = localStorage.getItem('likinex_demo_transactions');
       if (savedTx) {
         try {
-          setDemoTransactions(JSON.parse(savedTx));
-        } catch (e) {
-          const { userTransactions } = require('@/lib/userData');
+          const parsed = JSON.parse(savedTx);
+          setDemoTransactions(Array.isArray(parsed) ? parsed : userTransactions);
+        } catch {
           setDemoTransactions(userTransactions);
         }
       } else {
-        const { userTransactions } = require('@/lib/userData');
         setDemoTransactions(userTransactions);
       }
 
       const savedEnt = localStorage.getItem('likinex_demo_entities');
       if (savedEnt) {
         try {
-          setDemoEntities(JSON.parse(savedEnt));
-        } catch (e) {
+          const parsed = JSON.parse(savedEnt);
+          setDemoEntities(Array.isArray(parsed) ? parsed : DEFAULT_ENTITIES);
+        } catch {
           setDemoEntities(DEFAULT_ENTITIES);
         }
       } else {
@@ -209,8 +220,9 @@ function DashboardContent() {
       const savedCat = localStorage.getItem('likinex_demo_categories');
       if (savedCat) {
         try {
-          setDemoCategories(JSON.parse(savedCat));
-        } catch (e) {
+          const parsed = JSON.parse(savedCat);
+          setDemoCategories(Array.isArray(parsed) ? parsed : []);
+        } catch {
           setDemoCategories([]);
         }
       } else {
@@ -252,17 +264,20 @@ function DashboardContent() {
   };
 
   const handleCreateTransactionForContact = (contact: Contact) => {
+    const primaryAccount = contact.bank_accounts?.find(a => a.is_primary) || contact.bank_accounts?.[0];
     const newTx: Transaction = {
       id: `new_${Date.now()}`,
       description: `Pago a ${contact.name}`,
       amount: 0,
       due_date: new Date().toISOString().split('T')[0],
-      entity: 'oscaromargp', // Default entity
+      entity: 'oscaromargp',
       status: 'pending',
+      type: 'expense',
       recurrence: 'none',
+      category: 'otro',
       payment_method: contact.payment_method_preferred || 'transfer',
       contact_id: contact.id,
-      payment_destination: contact.bank_clabe || contact.bank_account || '',
+      payment_destination: contact.bank_clabe || contact.bank_account || primaryAccount?.clabe || primaryAccount?.account_number || '',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
@@ -299,6 +314,16 @@ function DashboardContent() {
     return dbTransactions.map(mapDBToTransaction);
   }, [dbTransactions, isDemo, demoTransactions]);
 
+  const filteredTransactions: Transaction[] = useMemo(() => {
+    if (!selectedEntity) return transactions;
+    return transactions.filter(t =>
+      (t.source_entity && t.source_entity === selectedEntity) ||
+      (t.destination_entity && t.destination_entity === selectedEntity)
+    );
+  }, [transactions, selectedEntity]);
+
+  const entitySectionTransactions = selectedEntity ? filteredTransactions : transactions;
+
   const entities: EntityConfig[] = useMemo(() => {
     if (isDemo) return demoEntities;
     return dbEntities.map(e => ({
@@ -315,14 +340,14 @@ function DashboardContent() {
     return dbCategories.map(c => c.name);
   }, [dbCategories, isDemo, demoCategories]);
 
-  const metrics = calculateMetrics(transactions);
-  const calendarEvents = generateCalendarEvents(transactions);
-  const smartAlerts = getSmartAlerts(transactions);
+  const metrics = calculateMetrics(entitySectionTransactions);
+  const calendarEvents = generateCalendarEvents(entitySectionTransactions);
+  const smartAlerts = getSmartAlerts(entitySectionTransactions);
   const alertCount = smartAlerts.length;
 
   const attachmentCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    transactions.forEach(t => {
+    entitySectionTransactions.forEach(t => {
       if (t.attachment_url) {
         const saved = localStorage.getItem(`likinex_attachments_${t.id}`);
         if (saved) {
@@ -415,9 +440,11 @@ function DashboardContent() {
 
   const handleCreateNewTransaction = () => {
     const todayStr = new Date().toISOString().split('T')[0];
+    const defaultEntity = entities[0]?.id || 'oscaromargp';
     const newTransaction: Transaction = {
       id: `new_${Date.now()}`,
-      entity: entities[0]?.id || 'oscaromargp',
+      entity: defaultEntity,
+      source_entity: defaultEntity,
       description: '',
       amount: 0,
       due_date: todayStr,
@@ -428,16 +455,17 @@ function DashboardContent() {
       payment_method: 'transfer',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
-    } as Transaction;
-    (newTransaction as any).operation_type = 'other';
+    };
     setSelectedTransaction(newTransaction);
     setIsDrawerOpen(true);
   };
 
   const handleDateDoubleClick = (date: string) => {
+    const defaultEntity = entities[0]?.id || 'oscaromargp';
     const newTransaction: Transaction = {
       id: `new_${Date.now()}`,
-      entity: entities[0]?.id || 'oscaromargp',
+      entity: defaultEntity,
+      source_entity: defaultEntity,
       description: '',
       amount: 0,
       due_date: date,
@@ -448,8 +476,7 @@ function DashboardContent() {
       payment_method: 'transfer',
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
-    } as Transaction;
-    (newTransaction as any).operation_type = 'other';
+    };
     setSelectedTransaction(newTransaction);
     setIsDrawerOpen(true);
   };
@@ -636,103 +663,25 @@ function DashboardContent() {
     );
   }
 
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'calendar', label: 'Calendario', icon: Calendar },
-    { id: 'ledger', label: 'Transacciones', icon: FileText },
-    { id: 'contacts', label: 'Contactos', icon: Users },
-    { id: 'settings', label: 'Configuración', icon: Settings }
-  ] as const;
-
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <div className="flex">
-        <aside className="w-64 h-screen bg-[var(--bg-secondary)]/80 backdrop-blur-xl border-r border-[var(--border-subtle)] fixed left-0 top-0 flex flex-col">
-          <div className="p-6 border-b border-[var(--border-subtle)]">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-indigo-500 rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                <span className="text-lg">💰</span>
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-white">LikinEX</h1>
-                <p className="text-xs text-slate-500">Orquestador de Liquidez</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="px-4 py-3 border-b border-[var(--border-subtle)]">
-            <div className="flex items-center gap-3 p-2 bg-[var(--bg-tertiary)]/30 rounded-lg">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${isDemo ? 'bg-blue-500/20' : 'bg-emerald-500/20'}`}>
-                <User className={`w-4 h-4 ${isDemo ? 'text-blue-400' : 'text-emerald-400'}`} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[var(--text-primary)] text-sm font-medium truncate">{user?.name || user?.email}</p>
-                <div className="flex items-center gap-2">
-                  <p className="text-[var(--text-muted)] text-xs truncate">{user?.email}</p>
-                  {isDemo && (
-                    <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs rounded-full">DEMO</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <nav className="flex-1 p-4">
-            <div className="space-y-2">
-              {navItems.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => setActiveView(item.id)}
-                  className={cn(
-                    'w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all',
-                    activeView === item.id
-                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                      : 'text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)]/50 hover:text-[var(--text-primary)]'
-                  )}
-                >
-                  <item.icon className="w-5 h-5" />
-                  <span className="font-medium">{item.label}</span>
-                </button>
-              ))}
-            </div>
-          </nav>
-
-          <div className="p-4 border-t border-[var(--border-subtle)]">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[var(--text-muted)] hover:bg-red-500/10 hover:text-red-400 transition-all"
-            >
-              <LogOut className="w-5 h-5" />
-              <span className="font-medium">Cerrar Sesión</span>
-            </button>
-          </div>
-        </aside>
+        <DashboardSidebar
+          activeView={activeView}
+          onViewChange={setActiveView}
+          user={user}
+          isDemo={isDemo}
+          onLogout={handleLogout}
+        />
 
         <main className="flex-1 ml-64">
-          <header className="h-16 bg-[var(--bg-secondary)]/50 backdrop-blur-xl border-b border-[var(--border-subtle)] px-8 flex items-center justify-between sticky top-0 z-30">
-            <div className="flex items-center gap-4">
-              <h2 className="text-lg font-semibold text-[var(--text-primary)] capitalize">{activeView}</h2>
-            </div>
-            <div className="flex items-center gap-4">
-              <button onClick={() => setShowNotifications(!showNotifications)} className="p-2 rounded-xl bg-[var(--bg-tertiary)]/50 hover:bg-[var(--bg-tertiary)] transition-colors relative">
-                <Bell className="w-5 h-5 text-[var(--text-muted)]" />
-                {alertCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full px-1">
-                    {alertCount}
-                  </span>
-                )}
-              </button>
-              {activeView !== 'settings' && (
-                <button 
-                  onClick={handleCreateNewTransaction}
-                  className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                  Nueva Transacción
-                </button>
-              )}
-            </div>
-          </header>
+          <DashboardHeader
+            activeView={activeView}
+            entitySelector={<EntitySelector entities={entities} selectedEntity={selectedEntity} onSelect={setSelectedEntity} />}
+            alertCount={alertCount}
+            onToggleNotifications={() => setShowNotifications(!showNotifications)}
+            onNewTransaction={handleCreateNewTransaction}
+          />
 
           {showNotifications && (
             <NotificationsPanel alerts={smartAlerts} onClose={() => setShowNotifications(false)} />
@@ -748,12 +697,12 @@ function DashboardContent() {
                 {/* Pulso Semanal + Saldos por Cuenta */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <WeeklyPulse
-                    transactions={transactions}
+                    transactions={entitySectionTransactions}
                     selectedEntity={selectedEntity}
                     entities={entities}
                   />
                   <AccountBalances
-                    transactions={transactions}
+                    transactions={entitySectionTransactions}
                     entities={entities}
                     onEntitySelect={(id) => setSelectedEntity(selectedEntity === id ? undefined : id)}
                   />
@@ -774,7 +723,7 @@ function DashboardContent() {
                     <h3 className="text-xl font-bold text-white mb-4">Transacciones Recientes</h3>
                     <div className="bg-slate-900/50 backdrop-blur-xl border border-emerald-500/20 rounded-2xl overflow-hidden">
                       <div className="divide-y divide-slate-800/30">
-                        {transactions.slice(0, 5).map((t, idx) => (
+                        {entitySectionTransactions.slice(0, 5).map((t, idx) => (
                           <motion.button
                             key={t.id}
                             initial={{ opacity: 0, x: -20 }}
@@ -807,24 +756,21 @@ function DashboardContent() {
 
                 <div className="space-y-8">
                   <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6">
-                    <CashFlowForecast
-                      transactions={transactions}
-                      liquidity={metrics}
-                      daysAhead={30}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6">
-                      <CreditCardEngine
-                        cards={mockCreditCards}
-                        currentBalance={metrics.available}
+                      <CashFlowForecast
+                        transactions={entitySectionTransactions}
+                        liquidity={metrics}
+                        daysAhead={30}
                       />
                     </div>
-                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6">
-                      <RiskToleranceEngine transactions={transactions} />
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                      <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6">
+                        <CreditCardManager />
+                      </div>
+                      <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6">
+                        <RiskToleranceEngine transactions={entitySectionTransactions} />
+                      </div>
                     </div>
-                  </div>
                 </div>
               </motion.div>
             )}
@@ -843,7 +789,7 @@ function DashboardContent() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <Ledger transactions={transactions} onRowClick={handleTransactionClick} onPrint={handlePrint} attachmentCounts={attachmentCounts} categories={categories} entities={entities} />
+                <Ledger transactions={entitySectionTransactions} onRowClick={handleTransactionClick} onPrint={handlePrint} attachmentCounts={attachmentCounts} categories={categories} entities={entities} />
               </motion.div>
             )}
 
@@ -908,98 +854,14 @@ function DashboardContent() {
         isVisible={showPDFReport}
       />
 
-      {/* Modal de confirmación para reprogramar pagos */}
-      <AnimatePresence>
-        {showDropConfirm && (() => {
-          const tx = transactions.find(t => t.id === showDropConfirm.eventId);
-          if (!tx) return null;
-          const oldDateObj = new Date(showDropConfirm.oldDate);
-          const newDateObj = new Date(showDropConfirm.newDate);
-          const diffDays = Math.round((newDateObj.getTime() - oldDateObj.getTime()) / (1000 * 60 * 60 * 24));
-          const graceDays = showDropConfirm.toleranceDays;
-          const exceedsGrace = diffDays > graceDays;
-
-          return (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4"
-              onClick={cancelDropMove}
-            >
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                onClick={(e) => e.stopPropagation()}
-                className="bg-slate-900 border border-amber-500/30 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl"
-              >
-                <div className="p-6 border-b border-slate-800/50">
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className="p-3 bg-amber-500/20 rounded-xl">
-                      <Icon icon="mdi:calendar-clock" className="w-6 h-6 text-amber-400" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-bold text-white">Reprogramar Pago</h3>
-                      <p className="text-sm text-slate-400">Mover fecha de vencimiento</p>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-slate-800/50 rounded-xl p-4 mb-4">
-                    <p className="text-white font-medium mb-2">{tx.description}</p>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-slate-500">Fecha actual:</span>
-                      <span className="text-amber-400 font-medium">{formatDate(showDropConfirm.oldDate)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm mt-1">
-                      <span className="text-slate-500">Nueva fecha:</span>
-                      <span className="text-emerald-400 font-medium">{formatDate(showDropConfirm.newDate)}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm mt-1">
-                      <span className="text-slate-500">Días de diferencia:</span>
-                      <span className="text-white font-medium">{diffDays} día{diffDays !== 1 ? 's' : ''}</span>
-                    </div>
-                  </div>
-
-                  {graceDays > 0 && (
-                    <div className={`rounded-xl p-3 flex items-start gap-2 ${exceedsGrace ? 'bg-red-500/10 border border-red-500/30' : 'bg-blue-500/10 border border-blue-500/30'}`}>
-                      <Icon icon={exceedsGrace ? "mdi:alert-circle" : "mdi:information"} className={`w-5 h-5 flex-shrink-0 mt-0.5 ${exceedsGrace ? 'text-red-400' : 'text-blue-400'}`} />
-                      <p className={`text-sm ${exceedsGrace ? 'text-red-300' : 'text-blue-300'}`}>
-                        {exceedsGrace 
-                          ? `Estás moviendo ${diffDays} días, pero solo tienes ${graceDays} día${graceDays !== 1 ? 's' : ''} de prórroga. ¿Realmente quieres pagar hasta el ${formatDate(showDropConfirm.newDate)}?`
-                          : `Tienes ${graceDays} día${graceDays !== 1 ? 's' : ''} de prórroga. Este movimiento está dentro del período de gracia.`
-                        }
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="p-6 grid grid-cols-2 gap-3">
-                  <button
-                    onClick={confirmDropMove}
-                    className="p-4 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 hover:border-emerald-500/50 rounded-xl transition-all group"
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <Icon icon="mdi:check-circle" className="w-6 h-6 text-emerald-400" />
-                      <p className="text-emerald-400 font-medium text-sm">Sí, reprogramar</p>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={cancelDropMove}
-                    className="p-4 bg-slate-800/50 hover:bg-slate-700/50 border border-slate-700/50 hover:border-slate-600 rounded-xl transition-all group"
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <Icon icon="mdi:cancel" className="w-6 h-6 text-slate-400" />
-                      <p className="text-slate-400 font-medium text-sm">Cancelar</p>
-                    </div>
-                  </button>
-                </div>
-              </motion.div>
-            </motion.div>
-          );
-        })()}
-      </AnimatePresence>
+      <DropConfirmModal
+        show={showDropConfirm !== null}
+        dropInfo={showDropConfirm}
+        transactions={transactions}
+        formatDate={formatDate}
+        onConfirm={confirmDropMove}
+        onCancel={cancelDropMove}
+      />
     </div>
   );
 }

@@ -22,7 +22,7 @@ const RECURRENCE_OPTIONS: { value: RecurrenceType; label: string; icon: string }
   { value: 'none', label: 'Sin recurrencia', icon: '➡️' },
   { value: 'weekly', label: 'Semanal', icon: '🔄' },
   { value: 'monthly', label: 'Mensual', icon: '📅' },
-  { value: 'semi_monthly', label: 'Quincenal (1 y 15)', icon: '⚡' },
+  { value: 'semi_monthly', label: 'Quincenal (días variables)', icon: '⚡' },
   { value: 'bimonthly', label: 'Bimestral', icon: '🗓️' },
   { value: 'quarterly', label: 'Trimestral', icon: '📆' },
   { value: 'yearly', label: 'Anual', icon: '🎆' },
@@ -141,9 +141,13 @@ export default function SideDrawer({
     msiMonths: 12,
     contact_id: '',
     payment_destination: '',
+    destination_entity: '',
     recurrence: 'none' as RecurrenceType,
     recurrence_days: [1, 15] as number[],
-    type: 'expense' as 'income' | 'expense',
+    recurrence_days_of_month: [] as number[],
+    recurrence_end_date: '',
+    recurrence_count: 0,
+    type: 'expense' as 'income' | 'expense' | 'transfer',
     operation_type: 'other' as string,
     tolerance_days: 2 as number,
     bank_id: '' as string,
@@ -187,9 +191,13 @@ export default function SideDrawer({
         msiMonths: 12,
         contact_id: transaction.contact_id || '',
         payment_destination: transaction.payment_destination || '',
+        destination_entity: transaction.destination_entity || '',
         recurrence: transaction.recurrence || 'none',
         recurrence_days: (transaction as any).recurrence_days || [1, 15],
-        type: transaction.type || 'expense',
+        recurrence_days_of_month: transaction.recurrence_days_of_month || [],
+        recurrence_end_date: transaction.recurrence_end_date || '',
+        recurrence_count: transaction.recurrence_count || 0,
+        type: transaction.type as typeof editForm.type,
         operation_type: (transaction as any).operation_type || 'other',
         tolerance_days: transaction.tolerance_days ?? 2,
         bank_id: (transaction as any).bank_id || '',
@@ -328,7 +336,20 @@ const handleSave = () => {
       alert('El monto no puede ser negativo');
       return;
     }
-    if (!editForm.entity) {
+    if (editForm.type === 'transfer') {
+      if (!editForm.entity) {
+        alert('Selecciona la entidad de origen');
+        return;
+      }
+      if (!editForm.destination_entity) {
+        alert('Selecciona la entidad de destino');
+        return;
+      }
+      if (editForm.entity === editForm.destination_entity) {
+        alert('La entidad de origen y destino deben ser diferentes');
+        return;
+      }
+    } else if (!editForm.entity) {
       alert('Selecciona una entidad');
       return;
     }
@@ -380,6 +401,8 @@ const handleSave = () => {
             status: 'pending',
             contact_id: editForm.contact_id || undefined,
             payment_destination: editForm.payment_destination || undefined,
+            source_entity: editForm.type !== 'income' ? editForm.entity : undefined,
+            destination_entity: editForm.type === 'transfer' ? editForm.destination_entity : undefined,
             recurrence: 'none',
             type: editForm.type,
             deadline_date: editForm.deadline_date || undefined,
@@ -469,7 +492,12 @@ const handleSave = () => {
         status: calculatedStatus,
         contact_id: editForm.contact_id || undefined,
         payment_destination: editForm.payment_destination || undefined,
+        source_entity: editForm.type !== 'income' ? editForm.entity : undefined,
+        destination_entity: editForm.type === 'transfer' ? editForm.destination_entity : undefined,
         recurrence: editForm.recurrence || 'none',
+        recurrence_days_of_month: editForm.recurrence_days_of_month?.length ? editForm.recurrence_days_of_month : undefined,
+        recurrence_end_date: editForm.recurrence_end_date || undefined,
+        recurrence_count: editForm.recurrence_count || undefined,
         type: editForm.type,
         deadline_date: editForm.deadline_date || undefined,
         late_justification: editForm.late_justification || undefined,
@@ -493,7 +521,12 @@ const handleSave = () => {
         status: calculatedStatus,
         contact_id: editForm.contact_id || undefined,
         payment_destination: editForm.payment_destination || undefined,
+        source_entity: editForm.type !== 'income' ? editForm.entity : undefined,
+        destination_entity: editForm.type === 'transfer' ? editForm.destination_entity : undefined,
         recurrence: editForm.recurrence || 'none',
+        recurrence_days_of_month: editForm.recurrence_days_of_month?.length ? editForm.recurrence_days_of_month : undefined,
+        recurrence_end_date: editForm.recurrence_end_date || undefined,
+        recurrence_count: editForm.recurrence_count || undefined,
         type: editForm.type,
         deadline_date: editForm.deadline_date || undefined,
         late_justification: editForm.late_justification || undefined,
@@ -503,7 +536,6 @@ const handleSave = () => {
       });
     }
   };
-
   const handleRecurrenceUpdateThis = () => {
     if (!pendingDateChange) return;
     const totalPaid = paymentRecords.reduce((sum, r) => sum + r.amount, 0);
@@ -763,7 +795,7 @@ const handleSave = () => {
                   <div className="p-3.5 bg-slate-800/40 border border-slate-800/60 rounded-xl">
                     <p className="text-[10px] text-slate-400 mb-1.5 font-semibold uppercase tracking-wider">Tipo de Movimiento</p>
                     {isEditing ? (
-                      <div className="grid grid-cols-2 gap-2 mt-1">
+                      <div className="grid grid-cols-3 gap-1.5 mt-1">
                         <button
                           type="button"
                           onClick={() => setEditForm(f => ({ ...f, type: 'expense' }))}
@@ -774,7 +806,7 @@ const handleSave = () => {
                               : "bg-slate-800/50 text-slate-400 border-transparent hover:text-white"
                           )}
                         >
-                          💸 Salida (Egreso)
+                          💸 Salida
                         </button>
                         <button
                           type="button"
@@ -786,46 +818,95 @@ const handleSave = () => {
                               : "bg-slate-800/50 text-slate-400 border-transparent hover:text-white"
                           )}
                         >
-                          💰 Entrada (Ingreso)
+                          💰 Entrada
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditForm(f => ({ ...f, type: 'transfer' }))}
+                          className={cn(
+                            "py-1.5 px-3 rounded-lg text-xs font-semibold border transition-all text-center flex items-center justify-center gap-1.5",
+                            editForm.type === 'transfer'
+                              ? "bg-cyan-500/20 text-cyan-400 border-cyan-500/30"
+                              : "bg-slate-800/50 text-slate-400 border-transparent hover:text-white"
+                          )}
+                        >
+                          🔄 Traspaso
                         </button>
                       </div>
                     ) : (
                       <p className={cn(
                         "text-sm font-semibold flex items-center gap-1.5",
-                        transaction.type === 'income' ? "text-emerald-400" : "text-rose-400"
+                        transaction.type === 'income' ? "text-emerald-400" : transaction.type === 'transfer' ? "text-cyan-400" : "text-rose-400"
                       )}>
-                        {transaction.type === 'income' ? "💰 Entrada (Ingreso/Cobro)" : "💸 Salida (Egreso/Pago)"}
+                        {transaction.type === 'income' ? "💰 Entrada (Ingreso/Cobro)" : transaction.type === 'transfer' ? "🔄 Traspaso entre cuentas" : "💸 Salida (Egreso/Pago)"}
                       </p>
                     )}
                   </div>
 
                   {/* Entity and Category */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
-                      <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Entidad</p>
-                      {isEditing ? (
-                        <select
-                          value={editForm.entity}
-                          onChange={e => setEditForm(f => ({ ...f, entity: e.target.value }))}
-                          className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
-                        >
-                          {DEFAULT_ENTITIES.map(ent => (
-                            <option key={ent.id} value={ent.id} className="bg-slate-900 text-white">
-                              {ent.icon} {ent.name}
-                            </option>
-                          ))}
-                          {entities.filter(e => !DEFAULT_ENTITIES.find(de => de.id === e.id)).map(ent => (
-                            <option key={ent.id} value={ent.id} className="bg-slate-900 text-white">
-                              {ent.icon} {ent.name}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <p className="text-white text-sm font-medium">
-                          {getEntityIcon(transaction.entity, entities)} {getEntityLabel(transaction.entity, entities)}
+                  <div className={cn("gap-4", isEditing && editForm.type === 'transfer' ? "space-y-3" : "grid grid-cols-2")}>
+                    {isEditing && editForm.type === 'transfer' ? (
+                      <>
+                        <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
+                          <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Origen</p>
+                          <select
+                            value={editForm.entity}
+                            onChange={e => setEditForm(f => ({ ...f, entity: e.target.value }))}
+                            className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
+                          >
+                            <option value="" className="bg-slate-900 text-slate-400">Seleccionar origen...</option>
+                            {(entities.length > 0 ? entities : DEFAULT_ENTITIES).map(ent => (
+                              <option key={ent.id} value={ent.id} className="bg-slate-900 text-white">
+                                {ent.icon} {ent.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
+                          <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Destino</p>
+                          <select
+                            value={editForm.destination_entity}
+                            onChange={e => setEditForm(f => ({ ...f, destination_entity: e.target.value }))}
+                            className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
+                          >
+                            <option value="" className="bg-slate-900 text-slate-400">Seleccionar destino...</option>
+                            {(entities.length > 0 ? entities : DEFAULT_ENTITIES).filter(ent => ent.id !== editForm.entity).map(ent => (
+                              <option key={ent.id} value={ent.id} className="bg-slate-900 text-white">
+                                {ent.icon} {ent.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
+                        <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">
+                          {editForm.type === 'income' ? 'Recibido por' : editForm.type === 'expense' ? 'Pagado por' : 'Entidad'}
                         </p>
-                      )}
-                    </div>
+                        {isEditing ? (
+                          <select
+                            value={editForm.entity}
+                            onChange={e => setEditForm(f => ({ ...f, entity: e.target.value }))}
+                            className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
+                          >
+                            <option value="" className="bg-slate-900 text-slate-400">Seleccionar...</option>
+                            {(entities.length > 0 ? entities : DEFAULT_ENTITIES).map(ent => (
+                              <option key={ent.id} value={ent.id} className="bg-slate-900 text-white">
+                                {ent.icon} {ent.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p className="text-white text-sm font-medium">
+                            {transaction.type === 'transfer' ? (
+                              <>{getEntityIcon(transaction.source_entity || transaction.entity, entities)} {getEntityLabel(transaction.source_entity || transaction.entity, entities)} → {getEntityIcon(transaction.destination_entity || transaction.entity, entities)} {getEntityLabel(transaction.destination_entity || transaction.entity, entities)}</>
+                            ) : (
+                              <>{getEntityIcon(transaction.entity, entities)} {getEntityLabel(transaction.entity, entities)}</>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
                       <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Categoría</p>
@@ -918,23 +999,37 @@ const handleSave = () => {
                       )}
                       {editForm.recurrence === 'semi_monthly' && isEditing && (
                         <div className="mt-3 p-3 bg-slate-800/30 rounded-lg border border-slate-700/30">
-                          <p className="text-[10px] text-slate-500 mb-2">Dias de vencimiento:</p>
-                          <div className="flex gap-2">
-                            {[1, 15].map(day => (
-                              <label key={day} className="flex items-center gap-1.5 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={editForm.recurrence_days?.includes(day) ?? true}
-                                  onChange={e => {
-                                    const days = e.target.checked
-                                      ? [...(editForm.recurrence_days || []), day].sort()
-                                      : (editForm.recurrence_days || []).filter(d => d !== day);
-                                    setEditForm(f => ({ ...f, recurrence_days: days }));
-                                  }}
-                                  className="w-4 h-4 rounded bg-slate-700 border-slate-600 text-emerald-500 focus:ring-emerald-500"
-                                />
-                                <span className="text-xs text-white">{day === 1 ? 'Dia 1' : 'Dia 15'}</span>
-                              </label>
+                          <p className="text-[10px] text-slate-500 mb-2">Días del mes</p>
+                          <input
+                            type="text"
+                            placeholder="Ej: 5, 20 (días separados por coma)"
+                            value={editForm.recurrence_days_of_month?.join(', ') || ''}
+                            onChange={e => {
+                              const days = e.target.value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n >= 1 && n <= 31);
+                              setEditForm(f => ({ ...f, recurrence_days_of_month: [...new Set(days)].sort((a, b) => a - b) }));
+                            }}
+                            className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white mb-2"
+                          />
+                          <div className="grid grid-cols-8 gap-1">
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                              <button
+                                key={day}
+                                type="button"
+                                onClick={() => {
+                                  const days = editForm.recurrence_days_of_month?.includes(day)
+                                    ? (editForm.recurrence_days_of_month || []).filter(d => d !== day)
+                                    : [...(editForm.recurrence_days_of_month || []), day];
+                                  setEditForm(f => ({ ...f, recurrence_days_of_month: days.sort((a, b) => a - b) }));
+                                }}
+                                className={cn(
+                                  "w-full aspect-square rounded text-[10px] font-medium transition-all",
+                                  editForm.recurrence_days_of_month?.includes(day)
+                                    ? "bg-emerald-500/30 text-emerald-300 border border-emerald-500/40"
+                                    : "bg-slate-800/50 text-slate-400 border border-slate-700/30 hover:bg-slate-700/50"
+                                )}
+                              >
+                                {day}
+                              </button>
                             ))}
                           </div>
                         </div>
@@ -950,6 +1045,28 @@ const handleSave = () => {
                         <p className="text-xs text-slate-400 mt-1">
                           Proxima fecha: <span className="text-white font-medium">{formatDate(editForm.due_date)}</span>
                         </p>
+                        <div className="mt-3 grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-1">Fecha de fin</label>
+                            <input
+                              type="date"
+                              value={editForm.recurrence_end_date}
+                              onChange={e => setEditForm(f => ({ ...f, recurrence_end_date: e.target.value }))}
+                              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-1">Máx. ocurrencias</label>
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="Sin límite"
+                              value={editForm.recurrence_count || ''}
+                              onChange={e => setEditForm(f => ({ ...f, recurrence_count: Number(e.target.value) }))}
+                              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                            />
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       <div className="grid grid-cols-2 gap-3">
@@ -1288,7 +1405,7 @@ const handleSave = () => {
                             onChange={e => setEditForm(f => ({ ...f, entity: e.target.value }))}
                             className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
                           >
-                            {DEFAULT_ENTITIES.map(ent => (
+                            {(entities.length > 0 ? entities : DEFAULT_ENTITIES).map(ent => (
                               <option key={ent.id} value={ent.id}>{ent.icon} {ent.name}</option>
                             ))}
                           </select>
@@ -1301,7 +1418,7 @@ const handleSave = () => {
                             className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
                           >
                             <option value="">Seleccionar...</option>
-                            {DEFAULT_ENTITIES.filter(e => e.id !== editForm.entity).map(ent => (
+                            {(entities.length > 0 ? entities : DEFAULT_ENTITIES).filter(e => e.id !== editForm.entity).map(ent => (
                               <option key={ent.id} value={ent.id}>{ent.icon} {ent.name}</option>
                             ))}
                           </select>
@@ -1808,7 +1925,7 @@ const handleSave = () => {
 
       {showReceipt && (
         <ReceiptReport
-          transaction={{ ...transaction, amount: Math.abs(transaction.amount), type: transaction.type || 'expense' } as any}
+          transaction={{ ...transaction, amount: Math.abs(transaction.amount), type: transaction.type } as any}
           onClose={() => setShowReceipt(false)}
         />
       )}

@@ -6,6 +6,8 @@ export interface TransactionDB {
   user_id: string;
   template_id: string | null;
   entity: string;
+  source_entity: string | null;
+  destination_entity: string | null;
   description: string;
   amount: number;
   currency: string;
@@ -15,6 +17,9 @@ export interface TransactionDB {
   recurrence: string;
   recurrence_day: number | null;
   recurrence_days: number[] | null;
+  recurrence_days_of_month: number[] | null;
+  recurrence_end_date: string | null;
+  recurrence_count: number | null;
   payment_method: string | null;
   category: string | null;
   type: string | null;

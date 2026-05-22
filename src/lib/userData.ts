@@ -1,4 +1,4 @@
-import { Transaction, TransactionTemplate, LiquidityMetrics, CalendarEvent, Entity } from '@/types';
+import { Transaction, TransactionTemplate, LiquidityMetrics, CalendarEvent } from '@/types';
 
 const today = new Date();
 const currentYear = today.getFullYear();
@@ -24,6 +24,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 1,
     payment_method: 'transfer',
     category: 'vps',
+    type: 'expense',
+    source_entity: 'zxyw',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -38,6 +40,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 5,
     payment_method: 'cash',
     category: 'servicio',
+    type: 'expense',
+    source_entity: 'centenario',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -53,12 +57,15 @@ export const userTransactions: Transaction[] = [
     payment_method: 'cash',
     category: 'limpieza',
     notes: 'Pago semanal los viernes',
+    type: 'expense',
+    source_entity: 'centenario',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
   {
     id: 'usr-4',
     entity: 'oscaromargp',
+    type: 'expense',
     description: 'CFE Personal',
     amount: 800,
     due_date: formatDate(new Date(currentYear, currentMonth, 10)),
@@ -68,6 +75,7 @@ export const userTransactions: Transaction[] = [
     payment_method: 'transfer',
     category: 'servicios_basicos',
     notes: 'Un mes sí y un mes no',
+    source_entity: 'oscaromargp',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -83,6 +91,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 12,
     payment_method: 'card',
     category: 'telefonia',
+    type: 'expense',
+    source_entity: 'centenario',
     created_at: '2024-01-01',
     updated_at: '2024-05-12'
   },
@@ -97,6 +107,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 13,
     payment_method: 'card',
     category: 'suscription',
+    type: 'expense',
+    source_entity: 'pardesantos',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -112,6 +124,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 14,
     payment_method: 'card',
     category: 'telefonia',
+    type: 'expense',
+    source_entity: 'paypaps',
     created_at: '2024-01-01',
     updated_at: '2024-05-14'
   },
@@ -126,6 +140,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 16,
     payment_method: 'card',
     category: 'suscription',
+    type: 'expense',
+    source_entity: 'paypaps',
     notes: 'Estimado según último registro de marzo',
     created_at: '2024-03-01',
     updated_at: '2024-03-01'
@@ -134,13 +150,15 @@ export const userTransactions: Transaction[] = [
     id: 'usr-10',
     entity: 'paypaps',
     description: 'Tarjeta Nu',
-    amount: -63.88,
+    amount: 63.88,
     due_date: formatDate(new Date(currentYear, currentMonth, 18)),
     status: 'pending',
     recurrence: 'monthly',
     recurrence_day: 18,
     payment_method: 'card',
     category: 'tarjeta',
+    type: 'expense',
+    source_entity: 'paypaps',
     notes: 'Monto para no generar intereses según estado de cuenta de mayo',
     created_at: '2024-05-01',
     updated_at: '2024-05-01'
@@ -156,6 +174,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 24,
     payment_method: 'transfer',
     category: 'renta',
+    type: 'expense',
+    source_entity: 'oscaromargp',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -170,6 +190,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 24,
     payment_method: 'card',
     category: 'telefonia',
+    type: 'expense',
+    source_entity: 'tulum',
     notes: 'Vencimiento 24 de mayo 2026',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
@@ -185,6 +207,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 28,
     payment_method: 'card',
     category: 'suscription',
+    type: 'expense',
+    source_entity: 'oscaromargp',
     notes: 'Monto variable',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
@@ -199,10 +223,12 @@ export const userTransactions: Transaction[] = [
     status: 'pending',
     recurrence: 'semi_monthly',
     recurrence_days: [1],
+    recurrence_days_of_month: [1],
     tolerance_days: 2,
     payment_method: 'transfer',
     category: 'pension',
     type: 'expense',
+    source_entity: 'oscaromargp',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -215,10 +241,12 @@ export const userTransactions: Transaction[] = [
     status: 'pending',
     recurrence: 'semi_monthly',
     recurrence_days: [15],
+    recurrence_days_of_month: [15],
     tolerance_days: 2,
     payment_method: 'transfer',
     category: 'pension',
     type: 'expense',
+    source_entity: 'oscaromargp',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -235,6 +263,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 5,
     payment_method: 'transfer',
     category: 'servicios_basicos',
+    type: 'expense',
+    source_entity: 'oscaromargp',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -251,6 +281,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 26,
     payment_method: 'transfer',
     category: 'servicios_basicos',
+    type: 'expense',
+    source_entity: 'centenario',
     notes: 'Último pago con vencimiento 26 abril 2026',
     created_at: '2024-01-01',
     updated_at: '2024-04-26'
@@ -266,6 +298,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 4,
     payment_method: 'transfer',
     category: 'servicios_basicos',
+    type: 'expense',
+    source_entity: 'tulum',
     notes: 'Último pago con vencimiento 04 mayo 2026',
     created_at: '2024-01-01',
     updated_at: '2024-05-04'
@@ -283,6 +317,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 18,
     payment_method: 'card',
     category: 'dominio',
+    type: 'expense',
+    source_entity: 'paypaps',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -297,6 +333,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 26,
     payment_method: 'card',
     category: 'dominio',
+    type: 'expense',
+    source_entity: 'zxyw',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -311,6 +349,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 9,
     payment_method: 'card',
     category: 'dominio',
+    type: 'expense',
+    source_entity: 'zxyw',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -325,6 +365,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 12,
     payment_method: 'card',
     category: 'dominio',
+    type: 'expense',
+    source_entity: 'bnrecords',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -339,6 +381,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 20,
     payment_method: 'card',
     category: 'dominio',
+    type: 'expense',
+    source_entity: 'pardesantos',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -353,6 +397,8 @@ export const userTransactions: Transaction[] = [
     recurrence_day: 12,
     payment_method: 'card',
     category: 'suscription',
+    type: 'expense',
+    source_entity: 'bnrecords',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -368,6 +414,7 @@ export const userTransactions: Transaction[] = [
     payment_method: 'card',
     category: 'suscription',
     type: 'expense',
+    source_entity: 'paypaps',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -383,6 +430,7 @@ export const userTransactions: Transaction[] = [
     payment_method: 'transfer',
     category: 'renta',
     type: 'income',
+    destination_entity: 'tulum',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -398,6 +446,7 @@ export const userTransactions: Transaction[] = [
     payment_method: 'transfer',
     category: 'servicio',
     type: 'income',
+    destination_entity: 'paypaps',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   },
@@ -413,6 +462,7 @@ export const userTransactions: Transaction[] = [
     payment_method: 'transfer',
     category: 'servicio',
     type: 'income',
+    destination_entity: 'oscaromargp',
     created_at: '2024-01-01',
     updated_at: '2024-01-01'
   }
@@ -481,11 +531,22 @@ function generateProjections(transaction: Transaction, monthsAhead: number): { d
   const baseDate = new Date(transaction.due_date);
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const limitDate = new Date(now.getFullYear(), now.getMonth() + monthsAhead, 0);
+  const limitDate = transaction.recurrence_end_date
+    ? new Date(transaction.recurrence_end_date + 'T23:59:59')
+    : new Date(now.getFullYear(), now.getMonth() + monthsAhead, 0);
 
   if (baseDate >= limitDate) return projections;
 
-  let currentDate = new Date(baseDate);
+  let currentDate = new Date(baseDate); // eslint-disable-line prefer-const
+  let count = 0;
+  const maxCount = transaction.recurrence_count || Infinity;
+
+  const pushIfValid = (projDate: Date) => {
+    if (projDate > baseDate && projDate <= limitDate && count < maxCount) {
+      projections.push({ date: formatDate(projDate) });
+      count++;
+    }
+  };
 
   switch (transaction.recurrence) {
     case 'weekly': {
@@ -496,10 +557,8 @@ function generateProjections(transaction: Transaction, monthsAhead: number): { d
       for (let d = 1; d <= monthsAhead * 7 + 7; d++) {
         const projDate = new Date(baseDate);
         projDate.setDate(projDate.getDate() + d);
-        if (projDate > baseDate && projDate <= limitDate) {
-          if (targetDays.includes(projDate.getDay())) {
-            projections.push({ date: formatDate(projDate) });
-          }
+        if (targetDays.includes(projDate.getDay())) {
+          pushIfValid(projDate);
         }
       }
       break;
@@ -515,15 +574,13 @@ function generateProjections(transaction: Transaction, monthsAhead: number): { d
           const daysInMonth = new Date(targetMonth.getFullYear(), targetMonth.getMonth() + 1, 0).getDate();
           const actualDay = Math.min(day, daysInMonth);
           const projDate = new Date(targetMonth.getFullYear(), targetMonth.getMonth(), actualDay);
-          if (projDate > baseDate && projDate <= limitDate) {
-            projections.push({ date: formatDate(projDate) });
-          }
+          pushIfValid(projDate);
         }
       }
       break;
     }
     case 'semi_monthly': {
-      const targetDays = transaction.recurrence_days || [1, 15];
+      const targetDays = transaction.recurrence_days_of_month || transaction.recurrence_days || [1, 15];
       const baseYear = now.getFullYear();
       const baseMonth = now.getMonth();
       
@@ -536,9 +593,9 @@ function generateProjections(transaction: Transaction, monthsAhead: number): { d
           const actualDay = Math.min(day, daysInMonth);
           const projDate = new Date(year, month, actualDay);
           
-          if (projDate > now && projDate >= baseDate && projDate <= limitDate) {
+          if (projDate > now && projDate >= baseDate) {
             if (projDate.getTime() !== baseDate.getTime()) {
-              projections.push({ date: formatDate(projDate) });
+              pushIfValid(projDate);
             }
           }
         }
@@ -547,31 +604,29 @@ function generateProjections(transaction: Transaction, monthsAhead: number): { d
     }
     case 'bimonthly': {
       currentDate.setMonth(currentDate.getMonth() + 2);
-      while (currentDate <= limitDate) {
-        projections.push({ date: formatDate(currentDate) });
+      while (currentDate <= limitDate && count < maxCount) {
+        pushIfValid(currentDate);
         currentDate.setMonth(currentDate.getMonth() + 2);
       }
       break;
     }
     case 'quarterly': {
       currentDate.setMonth(currentDate.getMonth() + 3);
-      while (currentDate <= limitDate) {
-        projections.push({ date: formatDate(currentDate) });
+      while (currentDate <= limitDate && count < maxCount) {
+        pushIfValid(currentDate);
         currentDate.setMonth(currentDate.getMonth() + 3);
       }
       break;
     }
     case 'triennial': {
       currentDate.setFullYear(currentDate.getFullYear() + 3);
-      if (currentDate <= limitDate) {
-        projections.push({ date: formatDate(currentDate) });
-      }
+      pushIfValid(currentDate);
       break;
     }
     case 'yearly': {
       currentDate.setFullYear(currentDate.getFullYear() + 1);
-      while (currentDate <= limitDate) {
-        projections.push({ date: formatDate(currentDate) });
+      while (currentDate <= limitDate && count < maxCount) {
+        pushIfValid(currentDate);
         currentDate.setFullYear(currentDate.getFullYear() + 1);
       }
       break;

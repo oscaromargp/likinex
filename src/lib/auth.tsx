@@ -55,7 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const urlParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
     if (urlParams.get('demo') === 'true') {
-      setIsDemo(true);
+      setIsDemo(true); // eslint-disable-line react-hooks/set-state-in-effect
       const demoUser: LikinexUser = {
         id: 'demo_user',
         email: 'demo@likinex.app',

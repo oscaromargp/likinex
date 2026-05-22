@@ -1,4 +1,4 @@
-import { Transaction, TransactionTemplate, LiquidityMetrics, CalendarEvent, Entity, CreditCard } from '@/types';
+import { Transaction, TransactionTemplate, LiquidityMetrics, CalendarEvent, CreditCard } from '@/types';
 
 const today = new Date();
 
@@ -89,6 +89,8 @@ export const mockTransactions: Transaction[] = [
     id: 'txn-1',
     template_id: 'tpl-1',
     entity: 'oscaromargp',
+    type: 'expense',
+    source_entity: 'oscaromargp',
     description: 'CFE Electricidad - Febrero',
     amount: 2450,
     due_date: formatDate(new Date(today.getFullYear(), today.getMonth(), 15)),
@@ -104,6 +106,8 @@ export const mockTransactions: Transaction[] = [
     id: 'txn-2',
     template_id: 'tpl-2',
     entity: 'centenario',
+    type: 'expense',
+    source_entity: 'centenario',
     description: 'Telmex Internet - Mayo',
     amount: 899,
     due_date: formatDate(new Date(today.getFullYear(), today.getMonth(), 20)),
@@ -118,6 +122,8 @@ export const mockTransactions: Transaction[] = [
     id: 'txn-3',
     template_id: 'tpl-3',
     entity: 'tulum',
+    type: 'expense',
+    source_entity: 'tulum',
     description: 'Gas Natural - Q2',
     amount: 1200,
     due_date: formatDate(new Date(today.getFullYear(), today.getMonth(), 1)),
@@ -133,6 +139,8 @@ export const mockTransactions: Transaction[] = [
     id: 'txn-4',
     template_id: 'tpl-4',
     entity: 'paypaps',
+    type: 'expense',
+    source_entity: 'paypaps',
     description: 'Dominios .com',
     amount: 450,
     due_date: formatDate(new Date(today.getFullYear() + 1, 0, 1)),
@@ -147,6 +155,8 @@ export const mockTransactions: Transaction[] = [
     id: 'txn-5',
     template_id: 'tpl-5',
     entity: 'bnrecords',
+    type: 'expense',
+    source_entity: 'bnrecords',
     description: 'VPS DigitalOcean',
     amount: 350,
     due_date: formatDate(new Date(today.getFullYear(), today.getMonth(), 10)),
@@ -161,6 +171,8 @@ export const mockTransactions: Transaction[] = [
   {
     id: 'txn-6',
     entity: 'zxyw',
+    type: 'expense',
+    source_entity: 'zxyw',
     description: 'Servicios Contables',
     amount: 2500,
     due_date: formatDate(new Date(today.getFullYear(), today.getMonth() - 1, 30)),
@@ -175,6 +187,8 @@ export const mockTransactions: Transaction[] = [
   {
     id: 'txn-7',
     entity: 'pardesantos',
+    type: 'expense',
+    source_entity: 'pardesantos',
     description: 'Seguro Auto - Mayo',
     amount: 3500,
     due_date: formatDate(new Date(today.getFullYear(), today.getMonth(), 5)),
@@ -188,6 +202,8 @@ export const mockTransactions: Transaction[] = [
   {
     id: 'txn-8',
     entity: 'oscaromargp',
+    type: 'expense',
+    source_entity: 'oscaromargp',
     description: 'Mantenimiento HVAC',
     amount: 4500,
     due_date: formatDate(new Date(today.getFullYear(), today.getMonth() + 1, 15)),
@@ -202,6 +218,8 @@ export const mockTransactions: Transaction[] = [
   {
     id: 'txn-9',
     entity: 'centenario',
+    type: 'expense',
+    source_entity: 'centenario',
     description: 'Licencia Adobe CC',
     amount: 1599,
     due_date: formatDate(new Date(today.getFullYear(), today.getMonth() - 2, 22)),
@@ -216,6 +234,8 @@ export const mockTransactions: Transaction[] = [
   {
     id: 'txn-10',
     entity: 'tulum',
+    type: 'expense',
+    source_entity: 'tulum',
     description: 'Limpieza Oficina',
     amount: 1200,
     due_date: formatDate(new Date(today.getFullYear(), today.getMonth(), 1)),

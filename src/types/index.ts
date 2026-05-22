@@ -107,8 +107,11 @@ export interface Transaction {
   template_id?: string;
   user_id?: string;
   entity: Entity;
+  source_entity?: string;
+  destination_entity?: string;
   description: string;
   amount: number;
+  currency?: string;
   due_date: string;
   deadline_date?: string;
   late_justification?: string;
@@ -117,9 +120,12 @@ export interface Transaction {
   recurrence: RecurrenceType;
   recurrence_day?: number;
   recurrence_days?: number[];
+  recurrence_days_of_month?: number[];
+  recurrence_end_date?: string;
+  recurrence_count?: number;
   payment_method?: PaymentMethod;
   category?: Category;
-  type?: 'income' | 'expense';
+  type: 'income' | 'expense' | 'transfer' | string;
   notes?: string;
   follow_up?: string;
   attachment_url?: string;
@@ -129,7 +135,7 @@ export interface Transaction {
   tolerance_days?: number;
   isProjection?: boolean;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 export interface TransactionTemplate {
@@ -380,7 +386,7 @@ export interface ServiceTolerance {
 }
 
 export const DEFAULT_TOLERANCES: ServiceTolerance[] = [
-  { service_type: ' CFE', tolerance_days: 2, criticality: 'critical' },
+  { service_type: 'servicios_basicos', tolerance_days: 2, criticality: 'critical' },
   { service_type: 'telefonia', tolerance_days: 3, criticality: 'critical' },
   { service_type: 'servicios_basicos', tolerance_days: 2, criticality: 'critical' },
   { service_type: 'renta', tolerance_days: 5, criticality: 'critical' },
@@ -406,6 +412,50 @@ export interface CreditCard {
   has_msi: boolean;
   msi_total: number;
   interest_rate: number;
+}
+
+export interface CreditCardAccount {
+  id: string;
+  user_id?: string;
+  entity: string;
+  name: string;
+  last4: string;
+  brand: 'visa' | 'mastercard' | 'amex' | 'other';
+  cut_off_day: number;
+  payment_due_day: number;
+  credit_limit: number;
+  current_balance: number;
+  available_credit: number;
+  interest_rate: number;
+  is_active: boolean;
+  color: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MSITransaction {
+  id: string;
+  card_id: string;
+  description: string;
+  total_amount: number;
+  monthly_payment: number;
+  total_months: number;
+  remaining_months: number;
+  start_date: string;
+  category?: string;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CardMonthlyPayment {
+  card_id: string;
+  month: string;
+  card_name: string;
+  min_payment: number;
+  total_payment: number;
+  msi_payments: { description: string; amount: number }[];
+  is_due: boolean;
 }
 
 export interface CardAlert {
