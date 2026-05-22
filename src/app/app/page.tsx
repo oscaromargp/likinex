@@ -414,11 +414,11 @@ function DashboardContent() {
           setSelectedTransaction(updated);
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving transaction:', err);
-      const msg = err instanceof Error ? err.message : 'Error desconocido';
-      if (msg.includes('column') || msg.includes('column_name') || msg.includes('does not exist')) {
-        alert('Error: La base de datos no tiene las columnas necesarias. Ve a https://likinex.vercel.app/api/migrate?secret=likinex-migrate-2026 para actualizar.');
+      const msg = err?.message || err?.error?.message || (typeof err === 'string' ? err : 'Error desconocido');
+      if (msg.toLowerCase().includes('column') || msg.includes('does not exist') || msg.includes('ambiguous')) {
+        alert('Error: La base de datos necesita actualización. Ve a https://likinex.vercel.app/api/migrate?secret=likinex-migrate-2026');
       } else {
         alert('Error al guardar: ' + msg);
       }
