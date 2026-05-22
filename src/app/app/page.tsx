@@ -401,27 +401,42 @@ function DashboardContent() {
     }
     if (!user) return;
 
-    try {
-      if (Array.isArray(updated)) {
-        for (const tx of updated) {
-          await createTransaction.mutateAsync(mapTransactionToDB(tx, user.id));
-        }
-      } else {
-        if (updated.id.startsWith('new_')) {
-          await createTransaction.mutateAsync(mapTransactionToDB(updated, user.id));
+    const stripNewFields = (tx: Transaction): Transaction => {
+      const { source_entity, destination_entity, recurrence_days_of_month, recurrence_end_date, recurrence_count, ...rest } = tx;
+      return rest as Transaction;
+    };
+
+    const doSave = async (useLegacy: boolean) => {
+      const txs = Array.isArray(updated) ? updated : [updated];
+      for (const tx of txs) {
+        const payload = useLegacy ? stripNewFields(tx) : tx;
+        const dbData = mapTransactionToDB(payload, user.id);
+        if (tx.id.startsWith('new_')) {
+          await createTransaction.mutateAsync(dbData);
         } else {
-          await updateTransaction.mutateAsync({ id: updated.id, ...mapTransactionToDB(updated, user.id) });
-          setSelectedTransaction(updated);
+          await updateTransaction.mutateAsync({ id: tx.id, ...dbData });
         }
       }
-    } catch (err: any) {
-      console.error('Error saving transaction:', err);
-      const msg = err?.message || err?.error?.message || (typeof err === 'string' ? err : 'Error desconocido');
-      if (msg.toLowerCase().includes('column') || msg.includes('does not exist') || msg.includes('ambiguous')) {
-        alert('Error: La base de datos necesita actualización. Ve a https://likinex.vercel.app/api/migrate?secret=likinex-migrate-2026');
-      } else {
-        alert('Error al guardar: ' + msg);
+      if (!Array.isArray(updated)) {
+        setSelectedTransaction(updated);
       }
+    };
+
+    try {
+      await doSave(false);
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.toLowerCase().includes('column') || msg.includes('does not exist')) {
+        console.warn('Columnas nuevas no existen en DB, reintentando sin ellas...');
+        try {
+          await doSave(true);
+          return;
+        } catch (legacyErr: any) {
+          alert('Error al guardar: ' + (legacyErr?.message || 'Error desconocido'));
+          return;
+        }
+      }
+      alert('Error al guardar: ' + msg);
     }
   };
 
