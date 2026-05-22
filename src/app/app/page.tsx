@@ -416,7 +416,12 @@ function DashboardContent() {
       }
     } catch (err) {
       console.error('Error saving transaction:', err);
-      alert('Error al guardar: ' + (err instanceof Error ? err.message : 'Error desconocido. Intenta correr la migración en /api/migrate'));
+      const msg = err instanceof Error ? err.message : 'Error desconocido';
+      if (msg.includes('column') || msg.includes('column_name') || msg.includes('does not exist')) {
+        alert('Error: La base de datos no tiene las columnas necesarias. Ve a https://likinex.vercel.app/api/migrate?secret=likinex-migrate-2026 para actualizar.');
+      } else {
+        alert('Error al guardar: ' + msg);
+      }
     }
   };
 
