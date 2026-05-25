@@ -7,8 +7,18 @@ export interface CreditCardDB {
   entity: string;
   name: string;
   last4: string;
+  // Columnas originales (migration 001)
   statement_day: number;
   due_day: number;
+  // Columnas nuevas (migration 003) — equivalentes con nombres mejorados
+  cut_off_day?: number;
+  payment_due_day?: number;
+  bank_name?: string;
+  brand?: string;
+  credit_limit?: number;
+  available_credit?: number;
+  color?: string;
+  is_active?: boolean;
   current_balance: number;
   minimum_payment: number;
   has_msi: boolean;

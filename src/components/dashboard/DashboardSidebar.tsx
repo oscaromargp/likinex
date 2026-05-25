@@ -1,9 +1,9 @@
 'use client';
 
-import { LayoutDashboard, Calendar, FileText, Settings, User, Users, LogOut } from 'lucide-react';
+import { LayoutDashboard, Calendar, FileText, Settings, User, Users, LogOut, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type ViewType = 'dashboard' | 'calendar' | 'ledger' | 'settings' | 'contacts';
+export type ViewType = 'dashboard' | 'calendar' | 'ledger' | 'settings' | 'contacts' | 'cuenta';
 
 interface DashboardSidebarProps {
   activeView: ViewType;
@@ -17,6 +17,7 @@ const navItems = [
   { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
   { id: 'calendar' as const, label: 'Calendario', icon: Calendar },
   { id: 'ledger' as const, label: 'Transacciones', icon: FileText },
+  { id: 'cuenta' as const, label: 'Cuenta', icon: CreditCard },
   { id: 'contacts' as const, label: 'Contactos', icon: Users },
   { id: 'settings' as const, label: 'Configuración', icon: Settings },
 ];

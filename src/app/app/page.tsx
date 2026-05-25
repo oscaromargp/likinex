@@ -13,7 +13,7 @@ import SideDrawer from '@/components/SideDrawer';
 import PDFReport from '@/components/PDFReport';
 import MetricsCards from '@/components/MetricsCards';
 import SettingsComponent from '@/components/Settings';
-import CreditCardManager from '@/components/CreditCardManager';
+import AccountManager from '@/components/AccountManager';
 import RiskToleranceEngine from '@/components/RiskToleranceEngine';
 import CashFlowForecast from '@/components/CashFlowForecast';
 import NotificationsPanel from '@/components/NotificationsPanel';
@@ -161,7 +161,7 @@ function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  const [activeView, setActiveView] = useState<'dashboard' | 'calendar' | 'ledger' | 'settings' | 'contacts'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'calendar' | 'ledger' | 'settings' | 'contacts' | 'cuenta'>('dashboard');
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [showPDFReport, setShowPDFReport] = useState(false);
@@ -401,20 +401,41 @@ function DashboardContent() {
     }
     if (!user) return;
 
-    const stripNewFields = (tx: Transaction): Transaction => {
-      const { source_entity, destination_entity, recurrence_days_of_month, recurrence_end_date, recurrence_count, ...rest } = tx;
-      return rest as Transaction;
-    };
+    // Crea un payload mínimo con solo columnas garantizadas en migration 001+002
+    const buildLegacyPayload = (tx: Transaction, uid: string) => ({
+      user_id: uid,
+      template_id: tx.template_id || null,
+      entity: tx.entity,
+      description: tx.description,
+      amount: tx.amount,
+      currency: 'MXN' as const,
+      due_date: tx.due_date,
+      paid_date: tx.paid_date || null,
+      status: tx.status,
+      recurrence: tx.recurrence,
+      recurrence_day: tx.recurrence_day || null,
+      recurrence_days: tx.recurrence_days || null,
+      payment_method: tx.payment_method || null,
+      category: tx.category || null,
+      type: tx.type || null,
+      notes: tx.notes || null,
+      follow_up: tx.follow_up || null,
+      attachment_url: tx.attachment_url || null,
+      price_change: tx.price_change || null,
+      tolerance_days: tx.tolerance_days ?? null,
+      contact_id: tx.contact_id || null,
+    });
 
     const doSave = async (useLegacy: boolean) => {
       const txs = Array.isArray(updated) ? updated : [updated];
       for (const tx of txs) {
-        const payload = useLegacy ? stripNewFields(tx) : tx;
-        const dbData = mapTransactionToDB(payload, user.id);
+        const dbData = useLegacy
+          ? buildLegacyPayload(tx, user.id)
+          : mapTransactionToDB(tx, user.id);
         if (tx.id.startsWith('new_')) {
-          await createTransaction.mutateAsync(dbData);
+          await createTransaction.mutateAsync(dbData as any);
         } else {
-          await updateTransaction.mutateAsync({ id: tx.id, ...dbData });
+          await updateTransaction.mutateAsync({ id: tx.id, ...(dbData as any) });
         }
       }
       if (!Array.isArray(updated)) {
@@ -426,13 +447,17 @@ function DashboardContent() {
       await doSave(false);
     } catch (err: any) {
       const msg = err?.message || '';
-      if (msg.toLowerCase().includes('column') || msg.includes('does not exist')) {
-        console.warn('Columnas nuevas no existen en DB, reintentando sin ellas...');
+      const isColumnError = msg.toLowerCase().includes('column') ||
+        msg.toLowerCase().includes('does not exist') ||
+        msg.toLowerCase().includes('invalid input value') ||
+        msg.toLowerCase().includes('enum');
+      if (isColumnError) {
+        console.warn('Columnas nuevas no existen en DB, reintentando con payload básico...');
         try {
           await doSave(true);
           return;
         } catch (legacyErr: any) {
-          alert('Error al guardar: ' + (legacyErr?.message || 'Error desconocido'));
+          alert('Error al guardar: ' + (legacyErr?.message || 'Error desconocido') + '\n\nVerifica que las migraciones SQL estén aplicadas en Supabase.');
           return;
         }
       }
@@ -783,13 +808,8 @@ function DashboardContent() {
                       />
                     </div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                      <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6">
-                        <CreditCardManager />
-                      </div>
-                      <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6">
-                        <RiskToleranceEngine transactions={entitySectionTransactions} />
-                      </div>
+                    <div className="bg-slate-900/50 backdrop-blur-xl border border-slate-800/50 rounded-2xl p-6">
+                      <RiskToleranceEngine transactions={entitySectionTransactions} />
                     </div>
                 </div>
               </motion.div>
@@ -810,6 +830,15 @@ function DashboardContent() {
                 animate={{ opacity: 1, y: 0 }}
               >
                 <Ledger transactions={entitySectionTransactions} onRowClick={handleTransactionClick} onPrint={handlePrint} attachmentCounts={attachmentCounts} categories={categories} entities={entities} />
+              </motion.div>
+            )}
+
+            {activeView === 'cuenta' && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <AccountManager userId={user?.id} isDemo={isDemo} />
               </motion.div>
             )}
 
