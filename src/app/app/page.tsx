@@ -343,7 +343,17 @@ function DashboardContent() {
     return dbCategories.map(c => c.name);
   }, [dbCategories, isDemo, demoCategories]);
 
-  const metrics = calculateMetrics(entitySectionTransactions);
+  // Dashboard metrics: only current month real transactions (no projections, no future months)
+  const currentMonthTransactions = useMemo(() => {
+    const now = new Date();
+    return entitySectionTransactions.filter(t => {
+      if ((t as any).isProjection) return false;
+      const d = new Date(t.due_date + 'T12:00:00');
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    });
+  }, [entitySectionTransactions]);
+
+  const metrics = calculateMetrics(currentMonthTransactions);
   const calendarEvents = generateCalendarEvents(entitySectionTransactions);
   const smartAlerts = getSmartAlerts(entitySectionTransactions);
   const alertCount = smartAlerts.length;
@@ -643,7 +653,13 @@ function DashboardContent() {
     setPrintFilters({ dateRange, entity, category, status, type });
     setShowPDFReport(true);
     setTimeout(() => {
+      // Set a meaningful filename (browser uses document.title for PDF name)
+      const now = new Date();
+      const stamp = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}${String(now.getMinutes()).padStart(2,'0')}`;
+      const prevTitle = document.title;
+      document.title = `LikinEX_Estado-de-Cuenta_${stamp}`;
       window.print();
+      document.title = prevTitle;
       setTimeout(() => setShowPDFReport(false), 500);
     }, 800);
   };

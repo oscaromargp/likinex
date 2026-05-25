@@ -12,8 +12,15 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
+/** Parse a date string safely at noon local time to avoid UTC offset shifting the day */
+function parseDateSafe(date: string): Date {
+  if (!date) return new Date();
+  // If it's a plain YYYY-MM-DD, append T12:00:00 to stay in the right local day
+  return date.length === 10 ? new Date(date + 'T12:00:00') : new Date(date);
+}
+
 export function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('es-MX', {
+  return parseDateSafe(date).toLocaleDateString('es-MX', {
     day: 'numeric',
     month: 'short',
     year: 'numeric'
@@ -21,10 +28,21 @@ export function formatDate(date: string): string {
 }
 
 export function formatDateInput(date: string): string {
-  return new Date(date).toLocaleDateString('es-MX', {
+  return parseDateSafe(date).toLocaleDateString('es-MX', {
     weekday: 'short',
     day: 'numeric',
     month: 'short'
+  });
+}
+
+export function formatDateTime(date: string): string {
+  const d = new Date(date);
+  return d.toLocaleDateString('es-MX', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 }
 

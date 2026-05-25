@@ -72,19 +72,12 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
   }, [customCategories]);
 
   const allEntities = useMemo(() => {
-    const seen = new Set<string>();
-    const result: { id: string; label: string }[] = [];
-    for (const [id, label] of Object.entries(ENTITY_LABELS)) {
-      seen.add(id);
-      result.push({ id, label });
+    // Prefer DB entities (user-defined); fall back to hardcoded ENTITY_LABELS only if DB is empty
+    const activeDbEntities = entities.filter(e => e.is_active);
+    if (activeDbEntities.length > 0) {
+      return activeDbEntities.map(e => ({ id: e.id, label: e.name }));
     }
-    for (const e of entities) {
-      if (e.is_active && !seen.has(e.id)) {
-        seen.add(e.id);
-        result.push({ id: e.id, label: e.name });
-      }
-    }
-    return result;
+    return Object.entries(ENTITY_LABELS).map(([id, label]) => ({ id, label }));
   }, [entities]);
 
   const generateVirtualProjections = (txs: Transaction[]): Transaction[] => {
@@ -491,7 +484,7 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
                   onClick={() => handleSort('due_date')}
                   className="flex items-center gap-2 text-xs font-semibold text-slate-400 uppercase tracking-wider hover:text-white transition-colors"
                 >
-                  Fecha Límite <SortIcon field="due_date" />
+                  Fecha Pago <SortIcon field="due_date" />
                 </button>
               </th>
               <th className="text-left p-4">
@@ -584,9 +577,22 @@ export default function Ledger({ transactions, onRowClick, onPrint, attachmentCo
                     </span>
                   </td>
                   <td className="p-4">
-                    <span className={cn('text-sm', urgent ? 'text-red-400 font-medium' : 'text-slate-400')}>
-                      {formatDate(transaction.due_date)}
-                    </span>
+                    <div className="flex flex-col gap-0.5">
+                      {transaction.paid_date ? (
+                        <>
+                          <span className="text-sm text-emerald-400 font-medium">
+                            ✓ {formatDate(transaction.paid_date)}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            Vence: {formatDate(transaction.due_date)}
+                          </span>
+                        </>
+                      ) : (
+                        <span className={cn('text-sm', urgent ? 'text-red-400 font-medium' : 'text-slate-400')}>
+                          {formatDate(transaction.due_date)}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="p-4">
                     <span className={cn('text-xs px-2 py-1 rounded-full', STATUS_COLORS[transaction.status])}>

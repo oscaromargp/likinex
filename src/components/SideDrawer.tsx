@@ -168,7 +168,8 @@ export default function SideDrawer({
     tolerance_days: 2 as number,
     bank_id: '' as string,
     deadline_date: '',
-    late_justification: ''
+    late_justification: '',
+    paid_date: '' as string,
   });
   
   const [attachments, setAttachments] = useState<AttachmentWithPreview[]>([]);
@@ -218,7 +219,8 @@ export default function SideDrawer({
         tolerance_days: transaction.tolerance_days ?? 2,
         bank_id: (transaction as any).bank_id || '',
         deadline_date: transaction.deadline_date || '',
-        late_justification: transaction.late_justification || ''
+        late_justification: transaction.late_justification || '',
+        paid_date: transaction.paid_date || '',
       });
       setIsEditing(transaction.id.startsWith('new_'));
       setShowDeleteConfirm(false);
@@ -517,9 +519,9 @@ const handleSave = () => {
         type: editForm.type,
         deadline_date: editForm.deadline_date || undefined,
         late_justification: editForm.late_justification || undefined,
-        paid_date: calculatedStatus === 'settled' 
-          ? (isIncome ? dueDate : paymentRecords[paymentRecords.length - 1]?.date || new Date().toISOString().split('T')[0]) 
-          : undefined
+        paid_date: calculatedStatus === 'settled'
+          ? (editForm.paid_date || (isIncome ? dueDate : paymentRecords[paymentRecords.length - 1]?.date || new Date().toISOString().split('T')[0]))
+          : (editForm.paid_date || undefined)
       };
       onUpdate([mainTx, ...updatedTxs]);
     } else {
@@ -546,9 +548,9 @@ const handleSave = () => {
         type: editForm.type,
         deadline_date: editForm.deadline_date || undefined,
         late_justification: editForm.late_justification || undefined,
-        paid_date: calculatedStatus === 'settled' 
-          ? (isIncome ? dueDate : paymentRecords[paymentRecords.length - 1]?.date || new Date().toISOString().split('T')[0]) 
-          : undefined
+        paid_date: calculatedStatus === 'settled'
+          ? (editForm.paid_date || (isIncome ? dueDate : paymentRecords[paymentRecords.length - 1]?.date || new Date().toISOString().split('T')[0]))
+          : (editForm.paid_date || undefined)
       });
     }
   };
@@ -1145,33 +1147,60 @@ const handleSave = () => {
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
                         <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
                           <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Fecha de Pago</p>
                           {isEditing ? (
-                            <input
-                              type="date"
-                              value={editForm.due_date}
-                              onChange={e => setEditForm(f => ({ ...f, due_date: e.target.value, deadline_date: f.deadline_date || e.target.value }))}
-                              className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
-                            />
+                            <>
+                              <input
+                                type="date"
+                                value={editForm.due_date}
+                                onChange={e => setEditForm(f => ({ ...f, due_date: e.target.value }))}
+                                className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer mb-2"
+                              />
+                              <div className="flex flex-wrap gap-1">
+                                {[
+                                  { label: 'Hoy', days: 0 },
+                                  { label: '+7d', days: 7 },
+                                  { label: '+15d', days: 15 },
+                                  { label: '+1m', months: 1 },
+                                ].map(opt => (
+                                  <button
+                                    key={opt.label}
+                                    type="button"
+                                    onClick={() => {
+                                      const d = new Date();
+                                      if (opt.days) d.setDate(d.getDate() + opt.days);
+                                      if (opt.months) d.setMonth(d.getMonth() + opt.months);
+                                      const str = d.toISOString().split('T')[0];
+                                      setEditForm(f => ({ ...f, due_date: str }));
+                                    }}
+                                    className="px-2 py-0.5 text-[10px] bg-slate-700/60 hover:bg-emerald-500/20 hover:text-emerald-300 text-slate-400 rounded border border-slate-600/50 transition-colors"
+                                  >
+                                    {opt.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
                           ) : (
                             <p className="text-white text-sm font-medium">{formatDate(transaction.due_date)}</p>
                           )}
                         </div>
-                        <div className="p-3 bg-slate-800/40 border border-slate-800/60 rounded-xl">
-                          <p className="text-[10px] text-slate-400 mb-1 font-semibold uppercase tracking-wider">Fecha Limite</p>
-                          {isEditing ? (
-                            <input
-                              type="date"
-                              value={editForm.deadline_date || editForm.due_date}
-                              onChange={e => setEditForm(f => ({ ...f, deadline_date: e.target.value }))}
-                              className="w-full bg-transparent text-white text-sm font-medium focus:outline-none cursor-pointer"
-                            />
-                          ) : (
-                            <p className="text-white text-sm font-medium">{transaction.deadline_date ? formatDate(transaction.deadline_date) : formatDate(transaction.due_date)}</p>
-                          )}
-                        </div>
+                        {editForm.paid_date || transaction.paid_date ? (
+                          <div className="p-3 bg-emerald-900/20 border border-emerald-500/20 rounded-xl">
+                            <p className="text-[10px] text-emerald-400 mb-1 font-semibold uppercase tracking-wider">Fecha de Pago Real</p>
+                            {isEditing ? (
+                              <input
+                                type="date"
+                                value={editForm.paid_date || ''}
+                                onChange={e => setEditForm(f => ({ ...f, paid_date: e.target.value }))}
+                                className="w-full bg-transparent text-emerald-300 text-sm font-medium focus:outline-none cursor-pointer"
+                              />
+                            ) : (
+                              <p className="text-emerald-300 text-sm font-medium">{transaction.paid_date ? formatDate(transaction.paid_date) : '—'}</p>
+                            )}
+                          </div>
+                        ) : null}
                       </div>
                     )}
 
