@@ -44,6 +44,12 @@ function getNextPaymentDate(dueDate: string, recurrence: string, recurrenceDays?
   const now = new Date();
   const day = recurrenceDays?.[0] || base.getDate();
 
+  if (recurrence === 'weekly') {
+    const next = new Date(base);
+    next.setDate(base.getDate() + 7);
+    return next.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+  }
+
   if (recurrence === 'monthly') {
     let next = new Date(now.getFullYear(), now.getMonth(), day);
     if (next <= now) {
@@ -69,6 +75,16 @@ function getNextPaymentDate(dueDate: string, recurrence: string, recurrenceDays?
   }
 
   return base.toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+// Returns next occurrence of a given weekday (0=Dom...6=Sáb) from today
+function nextWeekdayDate(weekday: number): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysUntil = (weekday - today.getDay() + 7) % 7 || 7;
+  const next = new Date(today);
+  next.setDate(today.getDate() + daysUntil);
+  return next.toISOString().split('T')[0];
 }
 
 const getFileIcon = (type: string) => {
@@ -996,6 +1012,66 @@ const handleSave = () => {
                         <p className="text-white text-sm font-medium">
                           🔄 {RECURRENCE_OPTIONS.find(o => o.value === transaction.recurrence)?.label || 'Sin recurrencia'}
                         </p>
+                      )}
+                      {editForm.recurrence === 'weekly' && isEditing && (
+                        <div className="mt-3 p-3 bg-slate-800/30 rounded-lg border border-slate-700/30 space-y-3">
+                          <p className="text-[10px] text-slate-500">Día de la semana</p>
+                          <div className="grid grid-cols-7 gap-1">
+                            {[
+                              { label: 'Dom', idx: 0 },
+                              { label: 'Lun', idx: 1 },
+                              { label: 'Mar', idx: 2 },
+                              { label: 'Mié', idx: 3 },
+                              { label: 'Jue', idx: 4 },
+                              { label: 'Vie', idx: 5 },
+                              { label: 'Sáb', idx: 6 },
+                            ].map(({ label, idx }) => {
+                              const currentDay = editForm.recurrence_days?.[0] ?? new Date(editForm.due_date + 'T12:00:00').getDay();
+                              const selected = currentDay === idx;
+                              return (
+                                <button
+                                  key={idx}
+                                  type="button"
+                                  onClick={() => {
+                                    const nextDate = nextWeekdayDate(idx);
+                                    setEditForm(f => ({
+                                      ...f,
+                                      recurrence_days: [idx],
+                                      due_date: nextDate,
+                                    }));
+                                  }}
+                                  className={cn(
+                                    'w-full py-1.5 rounded text-[10px] font-bold transition-all border',
+                                    selected
+                                      ? 'bg-emerald-500/30 text-emerald-300 border-emerald-500/40'
+                                      : 'bg-slate-800/50 text-slate-400 border-slate-700/30 hover:bg-slate-700/50'
+                                  )}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          <div>
+                            <label className="text-[10px] text-slate-400 block mb-1">Fecha del primer pago</label>
+                            <input
+                              type="date"
+                              value={editForm.due_date}
+                              onChange={e => {
+                                const d = new Date(e.target.value + 'T12:00:00');
+                                setEditForm(f => ({
+                                  ...f,
+                                  due_date: e.target.value,
+                                  recurrence_days: [d.getDay()],
+                                }));
+                              }}
+                              className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2 text-xs text-white"
+                            />
+                          </div>
+                          <p className="text-xs text-emerald-300/70">
+                            📅 Siguiente pago: {getNextPaymentDate(editForm.due_date, 'weekly', editForm.recurrence_days)}
+                          </p>
+                        </div>
                       )}
                       {editForm.recurrence === 'semi_monthly' && isEditing && (
                         <div className="mt-3 p-3 bg-slate-800/30 rounded-lg border border-slate-700/30">

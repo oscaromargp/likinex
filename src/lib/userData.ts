@@ -483,13 +483,23 @@ export const generateCalendarEvents = (transactions: Transaction[]): CalendarEve
   const events: CalendarEvent[] = [];
   const now = new Date();
   now.setHours(0, 0, 0, 0);
-  const oneWeekFromNow = new Date(now);
-  oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+  const threeMonthsFromNow = new Date(now);
+  threeMonthsFromNow.setMonth(threeMonthsFromNow.getMonth() + 3);
+
+  // Build a paid-date index: templateId → most recent paid_date
+  const lastPaidByTemplate: Record<string, string> = {};
+  transactions.forEach(t => {
+    if (t.template_id && t.status === 'settled' && t.paid_date) {
+      const current = lastPaidByTemplate[t.template_id];
+      if (!current || t.paid_date > current) {
+        lastPaidByTemplate[t.template_id] = t.paid_date;
+      }
+    }
+  });
 
   transactions.forEach(t => {
-    const txDate = new Date(t.due_date);
+    const txDate = new Date(t.due_date + 'T12:00:00');
     txDate.setHours(0, 0, 0, 0);
-    const isClose = txDate <= oneWeekFromNow;
 
     events.push({
       id: t.id,
@@ -499,16 +509,19 @@ export const generateCalendarEvents = (transactions: Transaction[]): CalendarEve
       entity: t.entity,
       status: t.status,
       isInstance: true,
-      isProjection: !isClose && t.status === 'pending'
+      isProjection: false,  // base instances are always visible
     });
 
     if (t.recurrence !== 'none' && t.status === 'pending') {
-      const projections = generateProjections(t, 24);
+      // Anchor projections from last paid_date if available (user-requested feature)
+      const anchorDate = t.template_id ? lastPaidByTemplate[t.template_id] : undefined;
+      const projections = generateProjections(t, 24, anchorDate);
       projections.forEach((proj, idx) => {
-        const projDate = new Date(proj.date);
+        const projDate = new Date(proj.date + 'T12:00:00');
         projDate.setHours(0, 0, 0, 0);
-        const projIsClose = projDate <= oneWeekFromNow;
-        
+        // Projections beyond 3 months are soft (lower priority)
+        const isSoft = projDate > threeMonthsFromNow;
+
         events.push({
           id: `${t.id}-proj-${idx}`,
           title: t.description,
@@ -517,7 +530,7 @@ export const generateCalendarEvents = (transactions: Transaction[]): CalendarEve
           entity: t.entity,
           status: 'pending' as const,
           isInstance: false,
-          isProjection: !projIsClose
+          isProjection: isSoft,
         });
       });
     }
@@ -526,9 +539,12 @@ export const generateCalendarEvents = (transactions: Transaction[]): CalendarEve
   return events.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 };
 
-function generateProjections(transaction: Transaction, monthsAhead: number): { date: string }[] {
+function generateProjections(transaction: Transaction, monthsAhead: number, anchorDateStr?: string): { date: string }[] {
   const projections: { date: string }[] = [];
-  const baseDate = new Date(transaction.due_date);
+  // If caller provides an anchor (last paid_date), project from there; else from due_date
+  const baseDate = anchorDateStr
+    ? new Date(anchorDateStr + 'T12:00:00')
+    : new Date(transaction.due_date + 'T12:00:00');
   const now = new Date();
   now.setHours(0, 0, 0, 0);
   const limitDate = transaction.recurrence_end_date

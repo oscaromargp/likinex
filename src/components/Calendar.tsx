@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Grid3X3, Eye } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, List, Grid3X3, Eye, AlertTriangle, X, CheckCircle, ArrowRight } from 'lucide-react';
 import { CalendarEvent, ENTITY_COLORS, STATUS_COLORS, ENTITY_LABELS } from '@/types';
 import { formatDateInput, isToday, isUrgent, formatCurrency } from '@/lib/utils';
 
@@ -11,13 +11,16 @@ interface CalendarProps {
   onEventClick?: (event: CalendarEvent) => void;
   onDateDoubleClick?: (date: string) => void;
   onEventDrop?: (eventId: string, newDate: string) => void;
+  onMoveToToday?: (eventId: string) => void;
+  onMarkOverduePaid?: (eventId: string) => void;
 }
 
 type ViewMode = 'grid' | 'table';
 
-export default function Calendar({ events, onEventClick, onDateDoubleClick, onEventDrop }: CalendarProps) {
+export default function Calendar({ events, onEventClick, onDateDoubleClick, onEventDrop, onMoveToToday, onMarkOverduePaid }: CalendarProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [showOverduePanel, setShowOverduePanel] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; date: string } | null>(null);
 
@@ -61,6 +64,15 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick, onEv
 
   const totalMonthAmount = monthEvents.reduce((sum, e) => sum + Math.abs(e.amount), 0);
 
+  // Overdue: isInstance events that are pending and due_date < today
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const todayStr = today.toISOString().split('T')[0];
+  const overdueEvents = useMemo(() =>
+    events.filter(e => e.isInstance && e.status === 'pending' && e.date < todayStr),
+    [events, todayStr]
+  );
+
   return (
     <div className="bg-slate-900/50 backdrop-blur-xl border border-emerald-500/20 rounded-2xl p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
@@ -76,6 +88,15 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick, onEv
                   <Eye className="w-3 h-3" />
                   Proyeccion
                 </span>
+              )}
+              {overdueEvents.length > 0 && (
+                <button
+                  onClick={() => setShowOverduePanel(v => !v)}
+                  className="text-xs px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 inline-flex items-center gap-1 hover:bg-red-500/30 transition-colors"
+                >
+                  <AlertTriangle className="w-3 h-3" />
+                  {overdueEvents.length} vencido{overdueEvents.length > 1 ? 's' : ''}
+                </button>
               )}
               <span className="text-xs text-slate-500">
                 {monthEvents.length} eventos | {formatCurrency(totalMonthAmount)}
@@ -120,6 +141,59 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick, onEv
         </div>
       </div>
 
+      {/* Overdue Panel */}
+      <AnimatePresence>
+        {showOverduePanel && overdueEvents.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="mb-4 overflow-hidden"
+          >
+            <div className="bg-red-950/40 border border-red-500/30 rounded-xl p-4 space-y-2">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-400" />
+                  <span className="text-sm font-semibold text-red-300">Pagos vencidos sin registrar</span>
+                </div>
+                <button onClick={() => setShowOverduePanel(false)} className="text-slate-400 hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              {overdueEvents.map(e => (
+                <div key={e.id} className="flex items-center justify-between bg-slate-900/50 rounded-lg px-3 py-2 gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-white truncate">{e.title}</p>
+                    <p className="text-[10px] text-red-400">
+                      Venció: {new Date(e.date + 'T12:00:00').toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      {' · '}{formatCurrency(e.amount)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => { onEventClick?.(e); setShowOverduePanel(false); }}
+                      className="px-2 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-medium hover:bg-emerald-500/30 transition-colors flex items-center gap-1"
+                      title="Abrir y registrar pago"
+                    >
+                      <CheckCircle className="w-3 h-3" />
+                      Registrar
+                    </button>
+                    <button
+                      onClick={() => { onMoveToToday?.(e.id); }}
+                      className="px-2 py-1 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded text-[10px] font-medium hover:bg-amber-500/30 transition-colors flex items-center gap-1"
+                      title="Mover vencimiento a hoy"
+                    >
+                      <ArrowRight className="w-3 h-3" />
+                      Mover a hoy
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {viewMode === 'grid' ? (
         <>
           <div className="grid grid-cols-7 gap-1 mb-2">
@@ -138,9 +212,10 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick, onEv
 
               const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
               const dayEvents = getEventsForDay(day);
-              const today = isToday(dateStr);
+              const isCurrentDay = isToday(dateStr);
               const isSelected = selectedDate === dateStr;
               const hasProjections = dayEvents.some(e => e.isProjection);
+              const hasOverdue = dayEvents.some(e => e.isInstance && e.status === 'pending' && e.date < todayStr);
 
               return (
                 <div
@@ -163,13 +238,13 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick, onEv
                   }}
                   className={`
                     h-24 p-1.5 rounded-lg transition-all relative flex flex-col items-start cursor-pointer select-none overflow-hidden border
-                    ${isSelected ? 'bg-emerald-500/10 border-emerald-500/40 shadow-inner' : 'bg-slate-800/30 hover:bg-slate-800/50 border-slate-800/40'}
-                    ${hasProjections ? 'ring-1 ring-indigo-500/20' : ''}
+                    ${isSelected ? 'bg-emerald-500/10 border-emerald-500/40 shadow-inner' : hasOverdue ? 'bg-red-950/20 border-red-500/30 hover:bg-red-950/30' : 'bg-slate-800/30 hover:bg-slate-800/50 border-slate-800/40'}
+                    ${hasProjections && !hasOverdue ? 'ring-1 ring-indigo-500/20' : ''}
                   `}
                 >
                   <span className={`
                     text-xs font-semibold w-5 h-5 flex items-center justify-center rounded-full mb-1
-                    ${today ? 'bg-emerald-500 text-white' : 'text-slate-400'}
+                    ${isCurrentDay ? 'bg-emerald-500 text-white' : hasOverdue ? 'text-red-400' : 'text-slate-400'}
                   `}>
                     {day}
                   </span>
@@ -180,7 +255,7 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick, onEv
                       return (
                         <div
                           key={e.id}
-                          draggable={!e.isProjection}
+                          draggable={true}
                           onDragStart={(ev) => {
                             ev.dataTransfer.setData('text/plain', e.id);
                             ev.dataTransfer.effectAllowed = 'move';
@@ -190,19 +265,21 @@ export default function Calendar({ events, onEventClick, onDateDoubleClick, onEv
                             onEventClick?.(e);
                           }}
                           className={`
-                            text-[9px] px-1 py-0.5 rounded truncate text-left border select-none transition-all hover:brightness-125
-                            ${e.isProjection 
-                              ? 'bg-indigo-950/30 text-indigo-400 border-indigo-500/10 opacity-70 style-dashed' 
-                              : e.status === 'settled' 
-                                ? 'bg-emerald-950/30 text-emerald-400 border-emerald-500/15' 
-                                : urgent 
-                                  ? 'bg-red-950/30 text-red-400 border-red-500/25 animate-pulse' 
-                                  : 'bg-amber-950/30 text-amber-400 border-amber-500/25'
+                            text-[9px] px-1 py-0.5 rounded truncate text-left border select-none transition-all hover:brightness-125 cursor-grab active:cursor-grabbing
+                            ${e.isProjection
+                              ? 'bg-indigo-900/40 text-indigo-300 border-indigo-500/30 border-dashed'
+                              : e.status === 'settled'
+                                ? 'bg-emerald-950/30 text-emerald-400 border-emerald-500/15'
+                                : e.status === 'pending' && e.date < todayStr
+                                  ? 'bg-red-900/50 text-red-300 border-red-500/40 animate-pulse'
+                                  : urgent
+                                    ? 'bg-red-950/30 text-red-400 border-red-500/25 animate-pulse'
+                                    : 'bg-amber-950/30 text-amber-400 border-amber-500/25'
                             }
                           `}
-                          title={`${e.title}: $${e.amount}`}
+                          title={`${e.title}: $${e.amount}${e.isProjection ? ' (proyección)' : ''}`}
                         >
-                          {e.title}
+                          {e.isProjection ? '◈ ' : ''}{e.title}
                         </div>
                       );
                     })}

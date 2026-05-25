@@ -531,26 +531,52 @@ function DashboardContent() {
   };
 
   const handleEventDrop = async (eventId: string, newDate: string) => {
-    if (eventId.includes('-proj-')) return;
+    // Projection drag → create a one-off instance on the new date
+    if (eventId.includes('-proj-')) {
+      const baseId = eventId.split('-proj-')[0];
+      const baseTx = transactions.find(t => t.id === baseId);
+      if (!baseTx || !user) return;
+      const oneOff: Transaction = {
+        ...baseTx,
+        id: `new_${Date.now()}`,
+        due_date: newDate,
+        recurrence: 'none',
+        template_id: baseTx.template_id || baseTx.id,
+        updated_at: new Date().toISOString(),
+        created_at: new Date().toISOString(),
+      };
+      await handleUpdateTransaction(oneOff);
+      return;
+    }
+
     const tx = transactions.find(t => t.id === eventId);
     if (!tx) return;
-    
+
     const oldDate = tx.due_date;
     const toleranceDays = tx.tolerance_days ?? 2;
-    const oldDateObj = new Date(oldDate);
-    const newDateObj = new Date(newDate);
+    const oldDateObj = new Date(oldDate + 'T12:00:00');
+    const newDateObj = new Date(newDate + 'T12:00:00');
     const diffDays = Math.round((newDateObj.getTime() - oldDateObj.getTime()) / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays > 0) {
       setShowDropConfirm({ eventId, oldDate, newDate, toleranceDays });
       return;
     }
-    
+
     const updated = {
       ...tx,
       due_date: newDate,
       updated_at: new Date().toISOString()
     };
+    await handleUpdateTransaction(updated);
+  };
+
+  // Move overdue payment to today
+  const handleMoveToToday = async (eventId: string) => {
+    const tx = transactions.find(t => t.id === eventId);
+    if (!tx) return;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const updated = { ...tx, due_date: todayStr, updated_at: new Date().toISOString() };
     await handleUpdateTransaction(updated);
   };
 
@@ -766,7 +792,7 @@ function DashboardContent() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div>
                     <h3 className="text-xl font-bold text-white mb-4">Calendario</h3>
-                    <CalendarComponent events={calendarEvents} onEventClick={handleEventClick} onDateDoubleClick={handleDateDoubleClick} onEventDrop={handleEventDrop} />
+                    <CalendarComponent events={calendarEvents} onEventClick={handleEventClick} onDateDoubleClick={handleDateDoubleClick} onEventDrop={handleEventDrop} onMoveToToday={handleMoveToToday} />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-white mb-4">Transacciones Recientes</h3>
@@ -824,7 +850,7 @@ function DashboardContent() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <CalendarComponent events={calendarEvents} onEventClick={handleEventClick} onDateDoubleClick={handleDateDoubleClick} onEventDrop={handleEventDrop} />
+                <CalendarComponent events={calendarEvents} onEventClick={handleEventClick} onDateDoubleClick={handleDateDoubleClick} onEventDrop={handleEventDrop} onMoveToToday={handleMoveToToday} />
               </motion.div>
             )}
 
