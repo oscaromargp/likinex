@@ -17,6 +17,7 @@ interface SmartAlert {
 interface NotificationsPanelProps {
   alerts: SmartAlert[];
   onClose: () => void;
+  onAlertClick?: (transaction: Transaction) => void;
 }
 
 const priorityConfig = {
@@ -36,7 +37,7 @@ const typeIcons = {
   liquidity: TrendingUp,
 };
 
-export default function NotificationsPanel({ alerts, onClose }: NotificationsPanelProps) {
+export default function NotificationsPanel({ alerts, onClose, onAlertClick }: NotificationsPanelProps) {
   return (
     <motion.div
       initial={{ opacity: 0, y: -20 }}
@@ -63,20 +64,35 @@ export default function NotificationsPanel({ alerts, onClose }: NotificationsPan
             const config = priorityConfig[alert.priority as keyof typeof priorityConfig] || priorityConfig.medium;
             const Icon = typeIcons[alert.type as keyof typeof typeIcons] || Info;
 
+            const isClickable = !!alert.transaction && !!onAlertClick;
+
             return (
               <motion.div
                 key={`${alert.type}-${idx}`}
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: idx * 0.05 }}
-                className={`p-4 rounded-xl ${config.bg} border ${config.border}`}
+                onClick={() => {
+                  if (isClickable) {
+                    onAlertClick!(alert.transaction);
+                    onClose();
+                  }
+                }}
+                className={`p-4 rounded-xl ${config.bg} border ${config.border} transition-all
+                  ${isClickable ? 'cursor-pointer hover:brightness-110 hover:scale-[1.01] active:scale-[0.99]' : ''}
+                `}
               >
                 <div className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg ${config.bg}`}>
+                  <div className={`p-2 rounded-lg ${config.bg} shrink-0`}>
                     <Icon className={`w-4 h-4 ${config.color}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`font-medium ${config.color}`}>{alert.title}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={`font-medium ${config.color}`}>{alert.title}</p>
+                      {isClickable && (
+                        <span className="text-[10px] text-slate-500 shrink-0">Abrir →</span>
+                      )}
+                    </div>
                     <p className="text-slate-300 text-sm mt-1">{alert.message}</p>
                     {alert.transaction && (
                       <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">

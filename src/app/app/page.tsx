@@ -759,7 +759,15 @@ function DashboardContent() {
           />
 
           {showNotifications && (
-            <NotificationsPanel alerts={smartAlerts} onClose={() => setShowNotifications(false)} />
+            <NotificationsPanel
+              alerts={smartAlerts}
+              onClose={() => setShowNotifications(false)}
+              onAlertClick={(tx) => {
+                setSelectedTransaction(tx);
+                setIsDrawerOpen(true);
+                setShowNotifications(false);
+              }}
+            />
           )}
 
           <div className="p-8">
