@@ -31,6 +31,9 @@ import { useEntities, useCreateEntity, useUpdateEntity, useDeleteEntity } from '
 import { useCategories, useCreateCategory, useDeleteCategory } from '@/hooks/useCategories';
 import { formatDate } from '@/lib/utils';
 
+const isValidUUID = (s?: string | null): boolean =>
+  !!s && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
 function mapDBToTransaction(db: TransactionDB): Transaction {
   return {
     id: db.id,
@@ -94,7 +97,7 @@ function mapTransactionToDB(tx: Transaction, userId: string): Omit<TransactionDB
     attachment_url: tx.attachment_url || null,
     price_change: tx.price_change || null,
     tolerance_days: tx.tolerance_days ?? null,
-    contact_id: tx.contact_id || null,
+    contact_id: isValidUUID(tx.contact_id) ? tx.contact_id! : null,
     payment_destination: tx.payment_destination || null,
     deadline_date: tx.deadline_date || null,
     late_justification: tx.late_justification || null,
@@ -423,7 +426,7 @@ function DashboardContent() {
       attachment_url: tx.attachment_url || null,
       price_change: tx.price_change || null,
       tolerance_days: tx.tolerance_days ?? null,
-      contact_id: tx.contact_id || null,
+      contact_id: isValidUUID(tx.contact_id) ? tx.contact_id! : null,
     });
 
     const doSave = async (useLegacy: boolean) => {
@@ -450,6 +453,7 @@ function DashboardContent() {
       const isColumnError = msg.toLowerCase().includes('column') ||
         msg.toLowerCase().includes('does not exist') ||
         msg.toLowerCase().includes('invalid input value') ||
+        msg.toLowerCase().includes('invalid input syntax') ||
         msg.toLowerCase().includes('enum');
       if (isColumnError) {
         console.warn('Columnas nuevas no existen en DB, reintentando con payload básico...');
